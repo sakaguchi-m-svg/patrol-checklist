@@ -7,6 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -168,6 +169,12 @@ body.pdf-mode .chief-blank{display:block!important}
 .db-sql-copy{width:100%;padding:9px;border:1.5px solid var(--bdr);border-radius:8px;background:var(--card);color:var(--blue2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:4px;transition:.15s}
 .db-sql-copy:active{background:var(--blue-lt)}
 
+/* ── EmailJS status ── */
+.ej-info{background:var(--blue-lt);border:1px solid var(--blue-mid);border-radius:10px;padding:12px 14px;font-size:12px;color:#1e40af;line-height:1.6;margin-bottom:12px}
+.ej-status{display:flex;align-items:center;gap:8px;padding:10px 13px;border-radius:10px;margin-bottom:12px;font-size:13px;font-weight:700}
+.ej-status.ok{background:var(--green-lt);color:var(--green);border:1px solid var(--green-mid)}
+.ej-status.idle{background:var(--bg);color:var(--sub);border:1px solid var(--bdr)}
+
 /* ── History modal ── */
 .hist-record{background:var(--bg);border-radius:12px;padding:14px 16px;margin-bottom:10px;border:1px solid var(--bdr)}
 .hist-date{font-size:11px;color:var(--sub);margin-bottom:10px;font-weight:600}
@@ -187,7 +194,7 @@ body.pdf-mode .chief-blank{display:block!important}
 <div class="hdr">
   <div class="hdr-l">
     <div class="hdr-t">📋 <span id="h-title">巡回チェックシート</span></div>
-    <div class="hdr-s" id="h-sub">Checklist de Inspecão</div>
+    <div class="hdr-s" id="h-sub">Checklist de Inspeção</div>
   </div>
   <div class="hdr-r">
     <div class="lang-bar">
@@ -314,6 +321,28 @@ CREATE POLICY "open" ON checklist_records
         <button class="db-connect-btn" id="st-connect-btn" onclick="connectDB()">接続する</button>
       </div>
 
+      <!-- EmailJS -->
+      <div class="settings-sec">
+        <div class="settings-sec-t" id="st-ej-t">📨 Email Direto (EmailJS)</div>
+        <div id="ej-status-bar" class="ej-status idle">
+          <span id="ej-status-txt">⬤ Não configurado</span>
+        </div>
+        <div class="ej-info" id="ej-info-box">Crie uma conta gratuita em emailjs.com (200 emails/mês) e configure os campos abaixo para envio direto sem abrir app de email.</div>
+        <div class="db-field">
+          <div class="db-field-lbl" id="st-ej-svc-lbl">Service ID</div>
+          <input class="reg-add-inp" style="width:100%;margin:0" id="ej-service-id" type="text" placeholder="service_xxxxxxx">
+        </div>
+        <div class="db-field">
+          <div class="db-field-lbl" id="st-ej-tpl-lbl">Template ID</div>
+          <input class="reg-add-inp" style="width:100%;margin:0" id="ej-template-id" type="text" placeholder="template_xxxxxxx">
+        </div>
+        <div class="db-field">
+          <div class="db-field-lbl" id="st-ej-key-lbl">Public Key</div>
+          <input class="reg-add-inp" style="width:100%;margin:0" id="ej-public-key" type="text" placeholder="XXXXXXXXXXXXXXXXX">
+        </div>
+        <button class="db-connect-btn" id="st-ej-save-btn" onclick="saveEmailJS()" style="background:linear-gradient(135deg,#065F46,#059669);box-shadow:0 2px 10px rgba(5,150,105,.35)">Salvar</button>
+      </div>
+
       <button class="settings-done-btn" id="settings-done-btn" onclick="closeSettings()">閉じる</button>
     </div>
   </div>
@@ -386,10 +415,16 @@ const LANGS = {
     dbConnecting:'接続中…',
     histTitle:'📊 履歴', histEmpty:'記録がありません', histLoading:'読み込み中…', histClose:'閉じる',
     histS:'安全', histQ:'品質',
+    stEjT:'📨 メール直接送信 (EmailJS)',
+    stEjSvcLbl:'Service ID', stEjTplLbl:'Template ID', stEjKeyLbl:'Public Key',
+    stEjSaveBtn:'保存', stEjInfo:'emailjs.com で無料アカウントを作成（月200通）し、Service ID・Template ID・Public Keyを入力してください。',
+    ejConfigured:'✅ EmailJS 設定済み', ejNotConfigured:'⬤ 未設定',
+    toastEjSaved:'✅ EmailJS 設定を保存しました!', toastEjSent:'✅ メール送信完了!', toastEjErr:'⚠️ メール送信エラー',
+    emDescDirect:'チェックリストの内容を直接メールで送信します。', emDescFallback:'PDFを生成して、メールアプリで送信します。',
     catS1:'フォークリフト・ピッキー操作', catS2:'状態・行動',
     catQ1:'ピッキング作業', catQ2:'振り出し作業', catQ3:'入荷作業',
     sItems:['リフト・ピッキーの充電場は整理・整頓されている','始業・終業点検が正しく行なわれている','管理者等決められた表示がされているか','リフト・ピッキーにキズ・汚れがない','リフトの鍵は決められた置場に保管する','リフトの2m以内には近付けさせない。歩行者には声かけできている','パレットへの爪差し込み時、根元まで差し込んでいるか','走行時リーチインしているか','走行時爪を平行以上にチルトしているか','リフトで後退する際、後方確認が出来ている','一時停止場所では確実に止まり、右左の確認ができている','ながら動作・急のつく作業をしていないか','リフト離れるときは爪先端を床につけているか','駐車時はキーを抜いているか','ゾーンに目立ったゴミが落ちていない','棚・パレットが白線の内側になっているか','PLの支柱にズレがない','とまれの表示は消えていないか','決められた場所以外に物が置かれていない（区画線がある）','タップコンセントにホコリはない','端末周辺の3Sができているか'],
-    qItems:['PLをほうきで清掃しているか','保護ダンボールを敷いているか','商品は1本ずつスキャンしているか','ロケーション内でスキャンしていないか','作業を中断せず1サイクル終わらせているか','ロケーションに仮置きしていないか','取り間違えたら先にロケに戻しているか','異常時の対応を適切に行っているか','出荷数量とラベル梱包数を照合しているか','届け先シールのコースとカンバンのコースを照合しているか','商品には目立ったホコリはない','商品に梱包上の異常がないか確認しているか（6面チェック）','商品がPLから落下しそうな荷揃えになっていないか','倒れ易い商品は必ず固定して運搬しているか','何処からの入荷か��認しているか','検品前に入荷品の外観確認をしているか','検品中同じ物を2度打ちしないようペンなどでしるしをしているか','検品中、梱包不良・不良品を受入れしないようにしているか','外部倉庫別に差し替えしているか','各外部倉庫の振り出し場にきちんと振り出しているか'],
+    qItems:['PLをほうきで清掃しているか','保護ダンボールを敷いているか','商品は1本ずつスキャンしているか','ロケーション内でスキャンしていないか','作業を中断せず1サイクル終わらせているか','ロケーションに仮置きしていないか','取り間違えたら先にロケに戻しているか','異常時の対応を適切に行っているか','出荷数量とラベル梱包数を照合しているか','届け先シールのコースとカンバンのコースを照合しているか','商品には目立ったホコリはない','商品に梱包上の異常がないか確認しているか（6面チェック）','商品がPLから落下しそうな荷揃えになっていないか','倒れ易い商品は必ず固定して運搬しているか','何処からの入荷か確認しているか','検品前に入荷品の外観確認をしているか','検品中同じ物を2度打ちしないようペンなどでしるしをしているか','検品中、梱包不良・不良品を受入れしないようにしているか','外部倉庫別に差し替えしているか','各外部倉庫の振り出し場にきちんと振り出しているか'],
   },
   pt:{
     appTitle:'Checklist de Inspeção', appSub:'巡回チェックシート',
@@ -422,6 +457,12 @@ const LANGS = {
     dbConnecting:'Conectando…',
     histTitle:'📊 Histórico', histEmpty:'Nenhum registro encontrado', histLoading:'Carregando…', histClose:'Fechar',
     histS:'Segurança', histQ:'Qualidade',
+    stEjT:'📨 Email Direto (EmailJS)',
+    stEjSvcLbl:'Service ID', stEjTplLbl:'Template ID', stEjKeyLbl:'Public Key',
+    stEjSaveBtn:'Salvar', stEjInfo:'Crie uma conta gratuita em emailjs.com (200 emails/mês) e configure os campos abaixo para envio direto sem abrir app de email.',
+    ejConfigured:'✅ EmailJS configurado', ejNotConfigured:'⬤ Não configurado',
+    toastEjSaved:'✅ EmailJS configurado!', toastEjSent:'✅ Email enviado com sucesso!', toastEjErr:'⚠️ Erro ao enviar email',
+    emDescDirect:'O checklist será enviado diretamente para o email informado.', emDescFallback:'O PDF será gerado e compartilhado pelo app de email.',
     catS1:'Operação de Empilhadeira / Picking', catS2:'Estado / Comportamento',
     catQ1:'Operação de Picking', catQ2:'Operação de Transferência', catQ3:'Operação de Recebimento',
     sItems:['A área de carregamento da empilhadeira/picking está organizada e arrumada','A inspeção de início e fim de turno está sendo realizada corretamente','As sinalizações definidas pelo gestor estão afixadas','A empilhadeira/picking está sem arranhões ou sujeira','A chave da empilhadeira está guardada no local determinado','Ninguém se aproxima a menos de 2m da empilhadeira; pedestres são avisados verbalmente','Ao inserir os garfos no palete, eles são inseridos até a base','O operador está em posição reach durante a condução','Os garfos estão inclinados paralelos ou abaixo durante a condução','Ao recuar, o operador verifica a parte traseira','Nas paradas obrigatórias, o operador para completamente e verifica os dois lados','O operador não realiza tarefas simultâneas ou movimentos bruscos','Ao se afastar da empilhadeira, os garfos estão com as pontas tocando o chão','Ao estacionar, a chave é removida','Não há lixo visível na zona','Prateleiras e paletes estão dentro da linha branca','Os pilares do PL não estão desalinhados','A sinalização de "PARE" está visível e não apagada','Nenhum objeto está fora do local determinado (há linhas de demarcação)','Não há poeira nas tomadas de extensão','A prática 3S está sendo feita ao redor dos terminais'],
@@ -458,6 +499,12 @@ const LANGS = {
     dbConnecting:'Menghubungkan…',
     histTitle:'📊 Riwayat', histEmpty:'Tidak ada data', histLoading:'Memuat…', histClose:'Tutup',
     histS:'Keselamatan', histQ:'Kualitas',
+    stEjT:'📨 Email Langsung (EmailJS)',
+    stEjSvcLbl:'Service ID', stEjTplLbl:'Template ID', stEjKeyLbl:'Public Key',
+    stEjSaveBtn:'Simpan', stEjInfo:'Buat akun gratis di emailjs.com (200 email/bulan) dan isi kolom di bawah untuk pengiriman langsung tanpa membuka app email.',
+    ejConfigured:'✅ EmailJS terkonfigurasi', ejNotConfigured:'⬤ Belum dikonfigurasi',
+    toastEjSaved:'✅ EmailJS disimpan!', toastEjSent:'✅ Email berhasil terkirim!', toastEjErr:'⚠️ Gagal mengirim email',
+    emDescDirect:'Isi checklist akan dikirim langsung ke email yang ditentukan.', emDescFallback:'PDF akan dibuat dan dikirim melalui aplikasi email.',
     catS1:'Operasi Forklift / Picking', catS2:'Kondisi / Perilaku',
     catQ1:'Operasi Picking', catQ2:'Operasi Transfer', catQ3:'Operasi Penerimaan',
     sItems:['Area pengisian daya forklift/picking sudah rapi dan teratur','Pemeriksaan awal dan akhir shift sudah dilakukan dengan benar','Rambu-rambu yang ditentukan oleh manajer sudah terpasang','Forklift/picking tidak ada goresan atau kotoran','Kunci forklift disimpan di tempat yang ditentukan','Tidak ada yang mendekati dalam radius 2m dari forklift; pejalan kaki diberi peringatan verbal','Saat memasukkan garpu ke palet, dimasukkan hingga ke pangkalnya','Operator dalam posisi reach saat berkendara','Garpu dimiringkan sejajar atau ke bawah saat berkendara','Saat mundur, operator memeriksa bagian belakang','Di titik berhenti, operator berhenti sepenuhnya dan memeriksa kedua sisi','Operator tidak melakukan multitasking atau gerakan mendadak','Saat meninggalkan forklift, ujung garpu menyentuh lantai','Kunci dicabut saat parkir','Tidak ada sampah yang terlihat di zona','Rak dan palet berada di dalam garis putih','Tiang PL tidak bergeser','Rambu "BERHENTI" terlihat jelas dan tidak pudar','Tidak ada benda di luar tempat yang ditentukan (ada garis demarkasi)','Tidak ada debu pada stop kontak','Praktik 3S sudah diterapkan di sekitar terminal'],
@@ -494,6 +541,12 @@ const LANGS = {
     dbConnecting:'Connecting…',
     histTitle:'📊 History', histEmpty:'No records found', histLoading:'Loading…', histClose:'Close',
     histS:'Safety', histQ:'Quality',
+    stEjT:'📨 Direct Email (EmailJS)',
+    stEjSvcLbl:'Service ID', stEjTplLbl:'Template ID', stEjKeyLbl:'Public Key',
+    stEjSaveBtn:'Save', stEjInfo:'Create a free account at emailjs.com (200 emails/month) and fill in the fields below to send directly without opening your email app.',
+    ejConfigured:'✅ EmailJS configured', ejNotConfigured:'⬤ Not configured',
+    toastEjSaved:'✅ EmailJS settings saved!', toastEjSent:'✅ Email sent successfully!', toastEjErr:'⚠️ Failed to send email',
+    emDescDirect:'Checklist data will be sent directly to the specified email.', emDescFallback:'A PDF will be generated and shared through your email app.',
     catS1:'Forklift / Picking Operation', catS2:'Status / Behavior',
     catQ1:'Picking Operation', catQ2:'Transfer Operation', catQ3:'Receiving Operation',
     sItems:['The forklift/picking charging area is organized and tidy','Start-of-shift and end-of-shift inspections are being carried out correctly','Manager-mandated signage is displayed','The forklift/picking equipment has no scratches or dirt','The forklift key is stored in the designated location','No one approaches within 2m of the forklift; pedestrians are verbally warned','When inserting forks into the pallet, they are inserted all the way to the base','The operator is in reach-in position while driving','The forks are tilted parallel or below while driving','When reversing, the operator checks the rear','At mandatory stop points, the operator stops completely and checks both sides','The operator does not multitask or make sudden movements','When leaving the forklift, the fork tips are touching the floor','The key is removed when parking','There is no visible trash in the zone','Shelves and pallets are inside the white line','PL pillars are not misaligned','"STOP" signage is visible and not faded','No objects are placed outside the designated area (demarcation lines present)','No dust on power strip sockets','3S practices are being applied around the terminals'],
@@ -507,7 +560,7 @@ const QUALITY_CATS = [{key:'catQ1',r:[0,12]},{key:'catQ2',r:[12,14]},{key:'catQ3
 /* ═══ LOCALSTORAGE ═══ */
 const STORE = 'patrol_v3';
 const DEFAULT_URL = 'https://ztyicpnnvkviqhmwfezp.supabase.co';
-function getData() { try{const d=JSON.parse(localStorage.getItem(STORE)||'{}'); return {members:d.members||[],zones:d.zones||[],dbUrl:d.dbUrl||DEFAULT_URL,dbKey:d.dbKey||''}}catch(e){return{members:[],zones:[],dbUrl:DEFAULT_URL,dbKey:''}} }
+function getData() { try{const d=JSON.parse(localStorage.getItem(STORE)||'{}'); return {members:d.members||[],zones:d.zones||[],dbUrl:d.dbUrl||DEFAULT_URL,dbKey:d.dbKey||'',ejServiceId:d.ejServiceId||'',ejTemplateId:d.ejTemplateId||'',ejPublicKey:d.ejPublicKey||''}}catch(e){return{members:[],zones:[],dbUrl:DEFAULT_URL,dbKey:'',ejServiceId:'',ejTemplateId:'',ejPublicKey:''}} }
 function saveData(d){ localStorage.setItem(STORE,JSON.stringify(d)) }
 
 /* ═══ SUPABASE ═══ */
@@ -596,8 +649,13 @@ function openSettings() {
   const d = getData(), L = LANGS[currentLang];
   document.getElementById('db-url').value = d.dbUrl || '';
   document.getElementById('db-key').value = d.dbKey || '';
+  document.getElementById('ej-service-id').value = d.ejServiceId || '';
+  document.getElementById('ej-template-id').value = d.ejTemplateId || '';
+  document.getElementById('ej-public-key').value = d.ejPublicKey || '';
   if (sbClient) setDbStatus('ok', L.dbConnected);
   else setDbStatus('idle', L.dbDisconnected);
+  if(d.ejServiceId && d.ejTemplateId && d.ejPublicKey) setEjStatus('ok', L.ejConfigured);
+  else setEjStatus('idle', L.ejNotConfigured);
   renderSettingsLists();
   document.getElementById('settings-modal').classList.add('on');
 }
@@ -629,6 +687,64 @@ function copySQL(){
     btn.textContent=LANGS[currentLang].stSqlCopied;
     setTimeout(()=>btn.textContent=LANGS[currentLang].stSqlCopy,2000);
   });
+}
+
+/* ═══ EMAILJS CONFIG ═══ */
+function saveEmailJS(){
+  const svcId=document.getElementById('ej-service-id').value.trim();
+  const tplId=document.getElementById('ej-template-id').value.trim();
+  const pubKey=document.getElementById('ej-public-key').value.trim();
+  const d=getData(); d.ejServiceId=svcId; d.ejTemplateId=tplId; d.ejPublicKey=pubKey; saveData(d);
+  const L=LANGS[currentLang];
+  if(svcId&&tplId&&pubKey){setEjStatus('ok',L.ejConfigured);showToast(L.toastEjSaved);}
+  else{setEjStatus('idle',L.ejNotConfigured);}
+}
+function setEjStatus(state,msg){
+  const el=document.getElementById('ej-status-bar'),txt=document.getElementById('ej-status-txt');
+  el.className='ej-status '+(state==='ok'?'ok':'idle');txt.textContent=msg;
+}
+function buildEmailBody(L){
+  const sZone=document.getElementById('s-zone').value||'—';
+  const sInsp=document.getElementById('s-insp').value||'—';
+  const sd1=document.getElementById('s-d1').value||'—';
+  const sd2=document.getElementById('s-d2').value||'—';
+  const qZone=document.getElementById('q-zone').value||'—';
+  const qInsp=document.getElementById('q-insp').value||'—';
+  const qd1=document.getElementById('q-d1').value||'—';
+  const qd2=document.getElementById('q-d2').value||'—';
+  const sComp=document.getElementById('s-comp').textContent;
+  const qComp=document.getElementById('q-comp').textContent;
+  const lines=[];
+  lines.push('='.repeat(52));
+  lines.push(L.appTitle);
+  lines.push('='.repeat(52));
+  lines.push('');
+  lines.push('['+L.compSubS+'] '+L.compLbl+': '+sComp);
+  lines.push(L.lblZone+': '+sZone+'  |  '+L.lblInsp+': '+sInsp);
+  lines.push(L.lblPeriod+': '+sd1+' ~ '+sd2);
+  lines.push('-'.repeat(40));
+  L.sItems.forEach((item,i)=>{
+    const n=i+1,val=ST.s[n];
+    const status=!val?'[ ]':val==='ok'?'[○]':'[×]';
+    const note=document.getElementById('nt-s-'+n)?.value?.trim();
+    lines.push(status+' '+n+'. '+item);
+    if(note) lines.push('   → '+note);
+  });
+  lines.push('');
+  lines.push('['+L.compSubQ+'] '+L.compLbl+': '+qComp);
+  lines.push(L.lblZone+': '+qZone+'  |  '+L.lblInsp+': '+qInsp);
+  lines.push(L.lblPeriod+': '+qd1+' ~ '+qd2);
+  lines.push('-'.repeat(40));
+  L.qItems.forEach((item,i)=>{
+    const n=i+1,val=ST.q[n];
+    const status=!val?'[ ]':val==='ok'?'[○]':'[×]';
+    const note=document.getElementById('nt-q-'+n)?.value?.trim();
+    lines.push(status+' '+n+'. '+item);
+    if(note) lines.push('   → '+note);
+  });
+  lines.push('');
+  lines.push('Enviado em: '+new Date().toLocaleString());
+  return lines.join('\n');
 }
 
 /* ═══ HISTORY ═══ */
@@ -741,6 +857,12 @@ function setLang(lang) {
   document.getElementById('st-key-lbl').textContent = L.stKeyLbl;
   document.getElementById('st-connect-btn').textContent = L.stConnectBtn;
   document.getElementById('hist-title').textContent = L.histTitle;
+  document.getElementById('st-ej-t').textContent = L.stEjT;
+  document.getElementById('st-ej-svc-lbl').textContent = L.stEjSvcLbl;
+  document.getElementById('st-ej-tpl-lbl').textContent = L.stEjTplLbl;
+  document.getElementById('st-ej-key-lbl').textContent = L.stEjKeyLbl;
+  document.getElementById('st-ej-save-btn').textContent = L.stEjSaveBtn;
+  document.getElementById('ej-info-box').textContent = L.stEjInfo;
   SAFETY_CATS.forEach(({key:k})=>{ const e=document.getElementById(`cat-s-${k}`); if(e) e.textContent=L[k]; });
   QUALITY_CATS.forEach(({key:k})=>{ const e=document.getElementById(`cat-q-${k}`); if(e) e.textContent=L[k]; });
   L.sItems.forEach((t,i)=>{ const e=document.getElementById(`cit-s-${i+1}`); if(e) e.textContent=t; });
@@ -785,7 +907,12 @@ function doReset(){
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2800);}
 
 /* ═══ EMAIL MODAL ═══ */
-function openEmailModal(){ document.getElementById('email-modal').classList.add('on'); }
+function openEmailModal(){
+  const d = getData(), L = LANGS[currentLang];
+  const isEjReady = d.ejServiceId && d.ejTemplateId && d.ejPublicKey;
+  document.getElementById('em-desc').textContent = isEjReady ? L.emDescDirect : L.emDescFallback;
+  document.getElementById('email-modal').classList.add('on');
+}
 function closeEmailModal(){ document.getElementById('email-modal').classList.remove('on'); }
 
 /* ═══ PDF ═══ */
@@ -834,12 +961,37 @@ async function sendEmail(){
   const ld=document.getElementById('ld');
   document.getElementById('ld-t').textContent=L.ldEmail;
   ld.classList.add('on');
+
+  const d=getData();
+  // ── Direct send via EmailJS ──
+  if(d.ejServiceId&&d.ejTemplateId&&d.ejPublicKey){
+    try{
+      saveRecord();
+      const body=buildEmailBody(L);
+      await emailjs.send(d.ejServiceId,d.ejTemplateId,{
+        to_email:emailTo,
+        from_name:L.appTitle,
+        subject:L.appTitle+' — '+new Date().toLocaleDateString(),
+        message:body,
+        reply_to:emailTo,
+      },d.ejPublicKey);
+      ld.classList.remove('on');
+      showToast(L.toastEjSent);
+    }catch(e){
+      ld.classList.remove('on');
+      console.error('EmailJS error:',e);
+      alert(L.toastEjErr+': '+(e.text||e.message||JSON.stringify(e)));
+    }
+    return;
+  }
+
+  // ── Fallback: PDF + mail client ──
   try{
     const pdf=await buildPDF(),fname=`checklist_${new Date().toISOString().slice(0,10)}.pdf`,blob=pdf.output('blob');
-    saveRecord(); // save to DB (non-blocking)
-    if(navigator.share&&navigator.canShare){const f=new File([blob],fname,{type:'application/pdf'});if(navigator.canShare({files:[f]})){ld.classList.remove('on');await navigator.share({files:[f],title:L.appTitle+' — '+new Date().toLocaleDateString(),text:L.emDesc});return;}}
+    saveRecord();
+    if(navigator.share&&navigator.canShare){const f=new File([blob],fname,{type:'application/pdf'});if(navigator.canShare({files:[f]})){ld.classList.remove('on');await navigator.share({files:[f],title:L.appTitle+' — '+new Date().toLocaleDateString(),text:L.emDescFallback});return;}}
     pdf.save(fname); ld.classList.remove('on');
-    window.open(`mailto:${emailTo}?subject=${encodeURIComponent(L.appTitle+' — '+new Date().toLocaleDateString())}&body=${encodeURIComponent(L.emDesc+'\n\n'+L.toastEmail)}`,'_self');
+    window.open(`mailto:${emailTo}?subject=${encodeURIComponent(L.appTitle+' — '+new Date().toLocaleDateString())}&body=${encodeURIComponent(L.emDescFallback+'\n\n'+L.toastEmail)}`,'_self');
     showToast(L.toastEmail);
   }catch(e){ld.classList.remove('on');if(e.name!=='AbortError'){console.error(e);alert(L.errPdf+e.message);}}
 }
