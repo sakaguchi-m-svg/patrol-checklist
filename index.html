@@ -1,1 +1,822 @@
-placeholder
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>巡回チェックシート</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --blue:#1565C0;--blue-g:linear-gradient(135deg,#1565C0,#1976D2);--blue-lt:#E3F2FD;
+  --green:#2E7D32;--green-g:linear-gradient(135deg,#2E7D32,#388E3C);--green-lt:#E8F5E9;
+  --ok:#43A047;--ng:#E53935;
+  --bg:#ECEFF1;--card:#fff;--txt:#212121;--sub:#757575;--bdr:#E0E0E0
+}
+html,body{font-family:-apple-system,'Hiragino Sans','Yu Gothic UI',Meiryo,sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+body{padding-bottom:76px}
+x}
+.chief-blank{display:none;width:100%;height:42px;background:rgba(255,255,255,.88);border-radius:5px}
+body.pdf-mode .chief-value{visibility:hidden}
+body.pdf-mode .chief-blank{display:block!important}
+
+/* ── Period ── */
+.dr{display:flex;align-items:center;gap:5px}
+.dr .fi{flex:1;min-width:0}
+.dsep{font-size:12px;white-space:nowrap}
+
+/* ── Compliance ── */
+.comp{background:var(--card);border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 3px rgba(0,0,0,.09)}
+.comp-l{font-size:12px;color:var(--sub)}
+.comp-s{font-size:10px;color:#BDBDBD;margin-top:2px}
+.comp-v{font-size:24px;font-weight:700}
+
+/* ── Category ── */
+.cat{font-size:11px;font-weight:700;letter-spacing:.4px;padding:7px 11px;border-radius:6px;margin:14px 0 6px}
+.cat.s{background:var(--blue-lt);color:var(--blue)}
+.cat.q{background:var(--green-lt);color:var(--green)}
+
+/* ── Check item ── */
+.ci{background:var(--card);border-radius:8px;padding:10px 12px;margin-bottom:6px;box-shadow:0 1px 2px rgba(0,0,0,.07)}
+.ci-top{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px}
+.ci-n{font-size:11px;font-weight:700;color:#BDBDBD;min-width:22px;padding-top:1px}
+.ci-t{font-size:13px;line-height:1.55;flex:1}
+.ci-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.evg{display:flex;gap:6px}
+.ev{width:46px;height:46px;border:2px solid var(--bdr);border-radius:9px;font-size:19px;font-weight:700;cursor:pointer;background:#FAFAFA;color:#BDBDBD;transition:.15s;display:flex;align-items:center;justify-content:center;font-family:inherit}
+.ev:active{transform:scale(.88)}
+.ev.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.ev.ng{background:var(--ng);border-color:var(--ng);color:#fff}
+.ev-l{font-size:11px}
+.nts{width:100%;border:1px solid var(--bdr);border-radius:6px;padding:6px 9px;font-size:12px;font-family:inherit;resize:none;min-height:32px;outline:none;color:#424242;transition:border-color .2s;line-height:1.4}
+.nts:focus{border-color:#90A4AE}
+.nts::placeholder{color:#BDBDBD}
+
+/* ── Bottom bar ── */
+.bar{position:fixed;bottom:0;left:0;right:0;background:#fff;padding:10px 12px;display:flex;gap:8px;box-shadow:0 -2px 8px rgba(0,0,0,.1);z-index:100}
+.bb{flex:1;padding:13px 6px;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
+.bb:active{transform:scale(.96)}
+.b-r{background:#ECEFF1;color:#546E7A}
+.b-p{background:var(--blue);color:#fff}
+.b-e{background:var(--green);color:#fff}
+
+/* ── Loading ── */
+.ld{display:none;position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:999;align-items:center;justify-content:center;flex-direction:column;gap:14px;color:#fff;font-size:15px;font-weight:600}
+.ld.on{display:flex}
+.spin{width:46px;height:46px;border:4px solid rgba(255,255,255,.22);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(16px);background:#323232;color:#fff;padding:10px 20px;border-radius:22px;font-size:13px;opacity:0;transition:.3s;z-index:998;pointer-events:none;white-space:nowrap;max-width:90vw;text-align:center}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── Modal backdrop ── */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:flex-end;justify-content:center}
+.modal-bg.on{display:flex}
+.modal{background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:520px;max-height:90vh;overflow-y:auto}
+.modal-hdr{padding:16px 18px 0;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:10;padding-bottom:12px;border-bottom:1px solid var(--bdr)}
+.modal-t{font-size:16px;font-weight:700}
+.modal-close{background:none;border:none;font-size:22px;color:var(--sub);cursor:pointer;padding:4px;line-height:1}
+.modal-body{padding:16px 18px 28px}
+
+/* ── Email modal ── */
+.modal-s{font-size:13px;color:var(--sub);margin-bottom:14px;line-height:1.5}
+.modal-inp{width:100%;border:1.5px solid var(--bdr);border-radius:8px;padding:12px;font-size:15px;font-family:inherit;outline:none;margin-bottom:12px}
+.modal-inp:focus{border-color:var(--blue)}
+.modal-btns{display:flex;gap:8px}
+.modal-btn{flex:1;padding:13px;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+.mb-c{background:#ECEFF1;color:#546E7A}
+.mb-s{background:var(--green);color:#fff}
+
+/* ── Settings ── */
+.settings-sec{margin-bottom:22px}
+.settings-sec-t{font-size:12px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:1.5px solid var(--bdr)}
+.reg-list{margin-bottom:10px;min-height:32px}
+.reg-item{display:flex;align-items:center;justify-content:space-between;background:var(--bg);border-radius:7px;padding:9px 12px;margin-bottom:6px}
+.reg-item-name{font-size:14px;font-weight:500}
+.reg-del{background:none;border:none;color:#E53935;font-size:18px;cursor:pointer;padding:2px 8px;font-weight:700;line-height:1}
+.reg-empty{font-size:13px;color:#BDBDBD;font-style:italic;padding:6px 0}
+.reg-add-row{display:flex;gap:8px}
+.reg-add-inp{flex:1;border:1.5px solid var(--bdr);border-radius:8px;padding:10px 12px;font-size:14px;font-family:inherit;outline:none}
+.reg-add-inp:focus{border-color:var(--blue)}
+.reg-add-btn{padding:10px 16px;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--blue);color:#fff}
+.reg-add-btn.g{background:var(--green)}
+.settings-done-btn{width:100%;padding:13px;border:none;border-radius:9px;background:#ECEFF1;color:#546E7A;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px}
+
+/* ── DB config ── */
+.db-status{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;margin-bottom:10px;font-size:13px;font-weight:600}
+.db-status.ok{background:#E8F5E9;color:#2E7D32}
+.db-status.err{background:#FFEBEE;color:#C62828}
+.db-status.idle{background:var(--bg);color:var(--sub)}
+.db-field-lbl{font-size:12px;color:var(--sub);margin-bottom:4px;font-weight:600}
+.db-field{margin-bottom:10px}
+.db-connect-btn{width:100%;padding:12px;border:none;border-radius:8px;background:var(--blue);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px}
+.db-sql-box{background:#263238;color:#80CBC4;border-radius:8px;padding:12px;font-size:11px;font-family:monospace;line-height:1.6;white-space:pre-wrap;margin:8px 0;overflow-x:auto}
+.db-sql-copy{width:100%;padding:9px;border:1.5px solid var(--bdr);border-radius:7px;background:#fff;color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:4px}
+
+/* ── History modal ── */
+.hist-record{background:var(--bg);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.hist-date{font-size:11px;color:var(--sub);margin-bottom:8px}
+.hist-row{display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:13px}
+.hist-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap}
+.hist-badge.s{background:var(--blue-lt);color:var(--blue)}
+.hist-badge.q{background:var(--green-lt);color:var(--green)}
+.hist-info{flex:1;color:var(--sub);font-size:12px}
+.hist-pct{font-weight:700;font-size:14px}
+.hist-empty{text-align:center;padding:32px 0;color:#BDBDBD;font-size:14px}
+.hist-loading{text-align:center;padding:24px 0;color:var(--sub);font-size:13px}
+</style>
+</head>
+<body>
+
+<!-- ══ HEADER ══ -->
+<div class="hdr">
+  <div class="hdr-l">
+    <div class="hdr-t">📋 <span id="h-title">巡回チェックシート</span></div>
+    <div class="hdr-s" id="h-sub">Checklist de Inspeção</div>
+  </div>
+  <div class="hdr-r">
+    <div class="lang-bar">
+      <button class="lang-btn" onclick="setLang('pt')">PT</button>
+      <button class="lang-btn active" onclick="setLang('ja')">JA</button>
+      <button class="lang-btn" onclick="setLang('id')">ID</button>
+      <button class="lang-btn" onclick="setLang('en')">EN</button>
+    </div>
+    <div class="icon-btn" id="hist-btn" onclick="openHistory()" title="Histórico" style="display:none">📊</div>
+    <div class="icon-btn" onclick="openSettings()">⚙️<div class="db-dot" id="db-dot"></div></div>
+  </div>
+</div>
+
+<!-- ══ TABS ══ -->
+<div class="tabs">
+  <button class="tab ts" id="tab-s" onclick="showTab('s',this)">🔵 <span id="tab-s-lbl">安全</span></button>
+  <button class="tab" id="tab-q" onclick="showTab('q',this)">🟢 <span id="tab-q-lbl">品質</span></button>
+</div>
+
+<!-- ══ SAFETY ══ -->
+<div id="sec-s" class="sec on">
+  <div class="fhdr s">
+    <div class="fhdr-t" id="s-hdr-t">安全巡回チェックシート</div>
+    <div class="flds">
+      <div class="fld"><div class="fld-l" id="s-lz">ゾーン</div><select class="fi-sel" id="s-zone"><option value="">—</option></select></div>
+      <div class="fld"><div class="fld-l" id="s-lc">職長</div><div><div class="chief-value">前田部長</div><div class="chief-blank"></div></div></div>
+      <div class="fld full"><div class="fld-l" id="s-lp">実施日</div><div class="dr"><input class="fi" id="s-d1" type="date"><span class="dsep">〜</span><input class="fi" id="s-d2" type="date"></div></div>
+      <div class="fld full"><div class="fld-l" id="s-li">巡回者</div><select class="fi-sel" id="s-insp"><option value="">—</option></select></div>
+    </div>
+  </div>
+  <div class="comp"><div><div class="comp-l" id="s-cl">遵守率</div><div class="comp-s" id="s-cs">安全</div></div><div class="comp-v" id="s-comp" style="color:#BDBDBD">—</div></div>
+  <div id="s-items"></div>
+</div>
+
+<!-- ══ QUALITY ══ -->
+<div id="sec-q" class="sec">
+  <div class="fhdr q">
+    <div class="fhdr-t" id="q-hdr-t">品質巡回チェックシート</div>
+    <div class="flds">
+      <div class="fld"><div class="fld-l" id="q-lz">ゾーン</div><select class="fi-sel" id="q-zone"><option value="">—</option></select></div>
+      <div class="fld"><div class="fld-l" id="q-lc">職長</div><div><div class="chief-value">前田部長</div><div class="chief-blank"></div></div></div>
+      <div class="fld full"><div class="fld-l" id="q-lp">実施日</div><div class="dr"><input class="fi" id="q-d1" type="date"><span class="dsep">〜</span><input class="fi" id="q-d2" type="date"></div></div>
+      <div class="fld full"><div class="fld-l" id="q-li">巡回者</div><select class="fi-sel" id="q-insp"><option value="">—</option></select></div>
+    </div>
+  </div>
+  <div class="comp"><div><div class="comp-l" id="q-cl">遵守率</div><div class="comp-s" id="q-cs">品質</div></div><div class="comp-v" id="q-comp" style="color:#BDBDBD">—</div></div>
+  <div id="q-items"></div>
+</div>
+
+<!-- ══ BOTTOM BAR ══ -->
+<div class="bar">
+  <button class="bb b-r" id="btn-reset" onclick="doReset()">🔄</button>
+  <button class="bb b-p" id="btn-pdf" onclick="makePDF()">📄 PDF</button>
+  <button class="bb b-e" id="btn-email" onclick="openEmailModal()">📧</button>
+</div>
+
+<!-- ══ LOADING ══ -->
+<div class="ld" id="ld"><div class="spin"></div><span id="ld-t">…</span></div>
+<div class="toast" id="toast"></div>
+
+<!-- ══ SETTINGS MODAL ══ -->
+<div class="modal-bg" id="settings-modal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-t" id="st-title">⚙️ 登録管理</div>
+      <button class="modal-close" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Members -->
+      <div class="settings-sec">
+        <div class="settings-sec-t" id="st-members-t">👤 巡回者登録</div>
+        <div class="reg-list" id="members-list"></div>
+        <div class="reg-add-row">
+          <input class="reg-add-inp" id="member-inp" placeholder="名前を入力…" onkeydown="if(event.key==='Enter')addMember()">
+          <button class="reg-add-btn" id="add-member-btn" onclick="addMember()">＋</button>
+        </div>
+      </div>
+
+      <!-- Zones -->
+      <div class="settings-sec">
+        <div class="settings-sec-t" id="st-zones-t">🏭 ゾーン登録</div>
+        <div class="reg-list" id="zones-list"></div>
+        <div class="reg-add-row">
+          <input class="reg-add-inp" id="zone-inp" placeholder="ゾーンを入力…" onkeydown="if(event.key==='Enter')addZone()">
+          <button class="reg-add-btn g" id="add-zone-btn" onclick="addZone()">＋</button>
+        </div>
+      </div>
+
+      <!-- Database -->
+      <div class="settings-sec">
+        <div class="settings-sec-t" id="st-db-t">🗄️ データベース (Supabase)</div>
+
+        <div id="db-status-bar" class="db-status idle">
+          <span id="db-status-txt">⬤ 未接続</span>
+        </div>
+
+        <!-- SQL instructions (collapsible) -->
+        <details style="margin-bottom:12px">
+          <summary style="font-size:12px;color:var(--blue);cursor:pointer;padding:4px 0;font-weight:600" id="st-sql-title">① SQL — Supabaseで実行してください</summary>
+          <div class="db-sql-box" id="db-sql-code">CREATE TABLE checklist_records (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  criado_em TIMESTAMPTZ DEFAULT NOW(),
+  zona_s TEXT, inspetor_s TEXT,
+  data_s_inicio DATE, data_s_fim DATE, taxa_s INT,
+  zona_q TEXT, inspetor_q TEXT,
+  data_q_inicio DATE, data_q_fim DATE, taxa_q INT,
+  idioma TEXT DEFAULT 'ja'
+);
+ALTER TABLE checklist_records ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "open" ON checklist_records
+  FOR ALL USING (true) WITH CHECK (true);</div>
+          <button class="db-sql-copy" id="st-sql-copy" onclick="copySQL()">📋 コピー</button>
+        </details>
+
+        <div class="db-field">
+          <div class="db-field-lbl" id="st-url-lbl">② Project URL</div>
+          <input class="reg-add-inp" style="width:100%;margin:0" id="db-url" type="url" placeholder="https://xxxxxxxxxxxx.supabase.co">
+        </div>
+        <div class="db-field">
+          <div class="db-field-lbl" id="st-key-lbl">③ Anon Key (API)</div>
+          <input class="reg-add-inp" style="width:100%;margin:0" id="db-key" type="text" placeholder="eyJhbGci…">
+        </div>
+        <button class="db-connect-btn" id="st-connect-btn" onclick="connectDB()">接続する</button>
+      </div>
+
+      <button class="settings-done-btn" id="settings-done-btn" onclick="closeSettings()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ EMAIL MODAL ══ -->
+<div class="modal-bg" id="email-modal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-t" id="em-title">📧 メール送信</div>
+      <button class="modal-close" onclick="closeEmailModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-s" id="em-desc">PDFを生成して、メールアプリで送信します。</div>
+      <input class="modal-inp" id="email-to" type="email" placeholder="email" value="sakaguchi-m@kk-joywork.co.jp">
+      <div class="modal-btns">
+        <button class="modal-btn mb-c" id="em-cancel" onclick="closeEmailModal()">キャンセル</button>
+        <button class="modal-btn mb-s" id="em-send" onclick="sendEmail()">生成して送信</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ HISTORY MODAL ══ -->
+<div class="modal-bg" id="hist-modal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-t" id="hist-title">📊 履歴</div>
+      <button class="modal-close" onclick="closeHistory()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="hist-content"><div class="hist-loading" id="hist-loading">読み込み中…</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════
+   TRANSLATIONS
+═══════════════════════════════════ */
+const LANGS = {
+  ja:{
+    appTitle:'巡回チェックシート', appSub:'Checklist de Inspeção',
+    tabS:'安全', tabQ:'品質',
+    sHdr:'安全巡回チェックシート', qHdr:'品質巡回チェックシート',
+    lblZone:'ゾーン', lblChief:'職長', lblPeriod:'実施日', lblInsp:'巡回者',
+    compLbl:'遵守率', compSubS:'安全', compSubQ:'品質',
+    evOk:'○ 適合', evNg:'× 不適合', evNone:'未評価',
+    ntsPh:'指摘事項・備考…',
+    btnReset:'🔄 リセット', btnPdf:'📄 PDF', btnEmail:'📧 送信',
+    ldPdf:'PDF生成中…', ldEmail:'メール準備中…', ldDb:'データベースに保存中…',
+    toastPdf:'✅ PDFダウンロード完了!', toastReset:'リセットしました',
+    toastEmail:'📥 PDFをダウンロード! メールに添付してください',
+    toastDbOk:'✅ データベースに保存しました!', toastDbErr:'⚠️ 保存エラー',
+    confirmReset:'フォームをリセットしますか?',
+    emTitle:'📧 メール送信', emDesc:'PDFを生成して、メールアプリで送信します。',
+    emCancel:'キャンセル', emSend:'生成して送信',
+    alertEmail:'有効なメールアドレスを入力してください',
+    errPdf:'PDFエラー: ',
+    stTitle:'⚙️ 登録管理', stMembersT:'👤 巡回者登録', stZonesT:'🏭 ゾーン登録',
+    stDbT:'🗄️ データベース (Supabase)',
+    memberPh:'名前を入力…', zonePh:'ゾーンを入力…',
+    addBtn:'＋', emptyList:'未登録', settingsDone:'閉じる',
+    selDefault:'— 選択 —',
+    stSqlTitle:'① SQL — Supabaseで実行してください',
+    stSqlCopy:'📋 コピー', stSqlCopied:'✅ コピー完了!',
+    stUrlLbl:'② Project URL', stKeyLbl:'③ Anon Key (API)',
+    stConnectBtn:'接続する',
+    dbConnected:'✅ 接続済み', dbDisconnected:'⬤ 未接続', dbError:'❌ 接続エラー',
+    dbConnecting:'接続中…',
+    histTitle:'📊 履歴', histEmpty:'記録がありません', histLoading:'読み込み中…', histClose:'閉じる',
+    histS:'安全', histQ:'品質',
+    catS1:'フォークリフト・ピッキー操作', catS2:'状態・行動',
+    catQ1:'ピッキング作業', catQ2:'振り出し作業', catQ3:'入荷作業',
+    sItems:['リフト・ピッキーの充電場は整理・整頓されている','始業・終業点検が正しく行なわれている','管理者等決められた表示がされているか','リフト・ピッキーにキズ・汚れがない','リフトの鍵は決められた置場に保管する','リフトの2m以内には近付けさせない。歩行者には声かけできている','パレットへの爪差し込み時、根元まで差し込んでいるか','走行時リーチインしているか','走行時爪を平行以上にチルトしているか','リフトで後退する際、後方確認が出来ている','一時停止場所では確実に止まり、右左の確認ができている','ながら動作・急のつく作業をしていないか','リフト離れるときは爪先端を床につけているか','駐車時はキーを抜いているか','ゾーンに目立ったゴミが落ちていない','棚・パレットが白線の内側になっているか','PLの支柱にズレがない','とまれの表示は消えていないか','決められた場所以外に物が置かれていない（区画線がある）','タップコンセントにホコリはない','端末周辺の3Sができているか'],
+    qItems:['PLをほうきで清掃しているか','保護ダンボールを敷いているか','商品は1本ずつスキャンしているか','ロケーション内でスキャンしていないか','作業を中断せず1サイクル終わらせているか','ロケーションに以置きしていないか','取り間違えたら先にロケに戻しているか','異常時の対応を適切に行っているか','出荷数量とラベル梱包数を照合しているか','届け先シールのコースとカンバンのコースを照合しているか','商品には目立ったホコリはない','商品に梱包上の異常がないか確認しているか（6面チェック）','商品がPLから落下しそうな荷揃えになっていないか','倒れ易い商品は必ず固定して運搬しているか','何処からの入荷か確認しているか','検品前に入荷品の外観確認をしているか','検品中同じ物を2度打ちしないようペンなどでしるしをしているか','検品中、梱包不良・不良品を受入れしないようにしているか','外部倉庫別に差し替えしているか','各外部倉庫の振り出し場にきちんと振り出しているか'],
+  },
+  pt:{
+    appTitle:'Checklist de Inspeção', appSub:'巡回チェックシート',
+    tabS:'Segurança', tabQ:'Qualidade',
+    sHdr:'Checklist — Segurança', qHdr:'Checklist — Qualidade',
+    lblZone:'Setor / Zona', lblChief:'職長', lblPeriod:'Período', lblInsp:'Inspetor',
+    compLbl:'Taxa de Conformidade', compSubS:'Segurança', compSubQ:'Qualidade',
+    evOk:'○ Conforme', evNg:'× Não conforme', evNone:'Não avaliado',
+    ntsPh:'Observações / Apontamentos…',
+    btnReset:'🔄 Limpar', btnPdf:'📄 PDF', btnEmail:'📧 Enviar',
+    ldPdf:'Gerando PDF…', ldEmail:'Preparando envio…', ldDb:'Salvando no banco…',
+    toastPdf:'✅ PDF baixado!', toastReset:'Formulário limpo!',
+    toastEmail:'📥 PDF baixado! Anexe ao email.',
+    toastDbOk:'✅ Salvo no banco de dados!', toastDbErr:'⚠️ Erro ao salvar',
+    confirmReset:'Deseja limpar todos os dados?',
+    emTitle:'📧 Enviar por Email', emDesc:'O PDF será gerado e compartilhado pelo app de email.',
+    emCancel:'Cancelar', emSend:'Gerar e Enviar',
+    alertEmail:'Por favor, insira um email válido.',
+    errPdf:'Erro ao gerar PDF: ',
+    stTitle:'⚙️ Gerenciar Registros', stMembersT:'👤 Membros da Patrulha', stZonesT:'🏭 Setores / Zonas',
+    stDbT:'🗄️ Banco de Dados (Supabase)',
+    memberPh:'Nome do membro…', zonePh:'Nome do setor…',
+    addBtn:'＋', emptyList:'Nenhum registro', settingsDone:'Fechar',
+    selDefault:'— Selecionar —',
+    stSqlTitle:'① SQL — Execute no Supabase',
+    stSqlCopy:'📋 Copiar', stSqlCopied:'✅ Copiado!',
+    stUrlLbl:'② Project URL', stKeyLbl:'③ Anon Key (API)',
+    stConnectBtn:'Conectar',
+    dbConnected:'✅ Conectado', dbDisconnected:'⬤ Não conectado', dbError:'❌ Erro de conexão',
+    dbConnecting:'Conectando…',
+    histTitle:'📊 Histórico', histEmpty:'Nenhum registro encontrado', histLoading:'Carregando…', histClose:'Fechar',
+    histS:'Segurança', histQ:'Qualidade',
+    catS1:'Operação de Empilhadeira / Picking', catS2:'Estado / Comportamento',
+    catQ1:'Operação de Picking', catQ2:'Operação de Transferência', catQ3:'Operação de Recebimento',
+    sItems:['A área de carregamento da empilhadeira/picking está organizada e arrumada','A inspeção de início e fim de turno está sendo realizada corretamente','As sinalizações definidas pelo gestor estão afixadas','A empilhadeira/picking está sem arranhões ou sujeira','A chave da empilhadeira está guardada no local determinado','Ninguém se aproxima a menos de 2m da empilhadeira; pedestres são avisados verbalmente','Ao inserir os garfos no palete, eles são inseridos até a base','O operador está em posição reach durante a condução','Os garfos estão inclinados paralelos ou abaixo durante a condução','Ao recuar, o operador verifica a parte traseira','Nas paradas obrigatórias, o operador para completamente e verifica os dois lados','O operador não realiza tarefas simultâneas ou movimentos bruscos','Ao se afastar da empilhadeira, os garfos estão com as pontas tocando o chão','Ao estacionar, a chave é removida','Não há lixo visível na zona','Prateleiras e paletes estão dentro da linha branca','Os pilares do PL não estão desalinhados','A sinalização de "PARE" está visível e não apagada','Nenhum objeto está fora do local determinado (há linhas de demarcação)','Não há poeira nas tomadas de extensão','A prática 3S está sendo feita ao redor dos terminais'],
+    qItems:['O PL está sendo varrido com vassoura','O papelão protetor está sendo usado','Os produtos estão sendo escaneados um por um','O escaneamento não está sendo feito dentro da localização','O operador conclui um ciclo completo sem interrupções','Nenhum produto está sendo deixado temporariamente na localização','Se um item é retirado por engano, é devolvido primeiro à localização','Situações anormais estão sendo tratadas adequadamente','A quantidade de envio está sendo conferida com a quantidade de embalagem do rótulo','O curso do adesivo de destinatário está sendo conferido com o curso do kanban','Os produtos não estão com poeira visível','Está sendo verificado se há anomalias na embalagem dos produtos (verificação de 6 faces)','Os produtos não estão arranjados de forma que possam cair do PL','Produtos instáveis estão sendo fixados antes do transporte','Está sendo verificado de onde vem o recebimento','A aparência dos itens recebidos está sendo verificada antes da inspeção','Durante a inspeção, está sendo marcado para não contar o mesmo item duas vezes','Durante a inspeção, produtos com embalagem defeituosa não estão sendo aceitos','Os itens estão sendo separados por depósito externo','Os itens estão sendo corretamente distribuídos no local de cada depósito externo'],
+  },
+  id:{
+    appTitle:'Checklist Inspeksi Patroli', appSub:'巡回チェックシート',
+    tabS:'Keselamatan', tabQ:'Kualitas',
+    sHdr:'Checklist — Keselamatan', qHdr:'Checklist — Kualitas',
+    lblZone:'Zona / Sektor', lblChief:'職長', lblPeriod:'Periode', lblInsp:'Inspektor',
+    compLbl:'Tingkat Kepatuhan', compSubS:'Keselamatan', compSubQ:'Kualitas',
+    evOk:'○ Sesuai', evNg:'× Tidak Sesuai', evNone:'Belum Dinilai',
+    ntsPh:'Catatan / Temuan…',
+    btnReset:'🔄 Reset', btnPdf:'📄 PDF', btnEmail:'📧 Kirim',
+    ldPdf:'Membuat PDF…', ldEmail:'Menyiapkan email…', ldDb:'Menyimpan ke database…',
+    toastPdf:'✅ PDF berhasil diunduh!', toastReset:'Formulir telah direset!',
+    toastEmail:'📥 PDF diunduh! Lampirkan ke email.',
+    toastDbOk:'✅ Tersimpan ke database!', toastDbErr:'⚠️ Gagal menyimpan',
+    confirmReset:'Hapus semua data formulir?',
+    emTitle:'📧 Kirim via Email', emDesc:'PDF akan dibuat dan dikirim melalui aplikasi email.',
+    emCancel:'Batal', emSend:'Buat & Kirim',
+    alertEmail:'Masukkan alamat email yang valid.',
+    errPdf:'Error membuat PDF: ',
+    stTitle:'⚙️ Manajemen Data', stMembersT:'👤 Anggota Patroli', stZonesT:'🏭 Zona / Sektor',
+    stDbT:'🗄️ Database (Supabase)',
+    memberPh:'Nama anggota…', zonePh:'Nama zona…',
+    addBtn:'＋', emptyList:'Belum ada data', settingsDone:'Tutup',
+    selDefault:'— Pilih —',
+    stSqlTitle:'① SQL — Jalankan di Supabase',
+    stSqlCopy:'📋 Salin', stSqlCopied:'✅ Tersalin!',
+    stUrlLbl:'② Project URL', stKeyLbl:'③ Anon Key (API)',
+    stConnectBtn:'Hubungkan',
+    dbConnected:'✅ Terhubung', dbDisconnected:'⬤ Tidak terhubung', dbError:'❌ Gagal terhubung',
+    dbConnecting:'Menghubungkan…',
+    histTitle:'📊 Riwayat', histEmpty:'Tidak ada data', histLoading:'Memuat…', histClose:'Tutup',
+    histS:'Keselamatan', histQ:'Kualitas',
+    catS1:'Operasi Forklift / Picking', catS2:'Kondisi / Perilaku',
+    catQ1:'Operasi Picking', catQ2:'Operasi Transfer', catQ3:'Operasi Penerimaan',
+    sItems:['Area pengisian daya forklift/picking sudah rapi dan teratur','Pemeriksaan awal dan akhir shift sudah dilakukan dengan benar','Rambu-rambu yang ditentukan oleh manajer sudah terpasang','Forklift/picking tidak ada goresan atau kotoran','Kunci forklift disimpan di tempat yang ditentukan','Tidak ada yang mendekati dalam radius 2m dari forklift; pejalan kaki diberi peringatan verbal','Saat memasukkan garpu ke palet, dimasukkan hingga ke pangkalnya','Operator dalam posisi reach saat berkendara','Garpu dimiringkan sejajar atau ke bawah saat berkendara','Saat mundur, operator memeriksa bagian belakang','Di titik berhenti, operator berhenti sepenuhnya dan memeriksa kedua sisi','Operator tidak melakukan multitasking atau gerakan mendadak','Saat meninggalkan forklift, ujung garpu menyentuh lantai','Kunci dicabut saat parkir','Tidak ada sampah yang terlihat di zona','Rak dan palet berada di dalam garis putih','Tiang PL tidak bergeser','Rambu "BERHENTI" terlihat jelas dan tidak pudar','Tidak ada benda di luar tempat yang ditentukan (ada garis demarkasi)','Tidak ada debu pada stop kontak','Praktik 3S sudah diterapkan di sekitar terminal'],
+    qItems:['PL sedang dibersihkan dengan sapu','Kardus pelindung sudah dipasang','Produk dipindai satu per satu','Pemindaian tidak dilakukan di dalam lokasi','Operator menyelesaikan satu siklus penuh tanpa gangguan','Tidak ada produk yang diletakkan sementara di lokasi','Jika salah ambil, produk dikembalikan dulu ke lokasi','Situasi tidak normal ditangani dengan tepat','Jumlah pengiriman dicocokkan dengan jumlah kemasan label','Rute stiker tujuan dicocokkan dengan rute kanban','Produk tidak terlihat berdebu','Produk diperiksa apakah ada kelainan pada kemasan (pemeriksaan 6 sisi)','Produk tidak diatur sedemikian rupa sehingga dapat jatuh dari PL','Produk yang mudah jatuh selalu dipasang sebelum diangkut','Asal penerimaan barang sudah dikonfirmasi','Tampilan luar barang masuk diperiksa sebelum inspeksi','Selama inspeksi, barang yang sama tidak dihitung dua kali (diberi tanda)','Selama inspeksi, produk dengan kemasan cacat atau rusak tidak diterima','Barang sudah dipisahkan berdasarkan gudang eksternal','Barang sudah didistribusikan dengan benar ke titik distribusi setiap gudang eksternal'],
+  },
+  en:{
+    appTitle:'Patrol Inspection Checklist', appSub:'巡回チェックシート',
+    tabS:'Safety', tabQ:'Quality',
+    sHdr:'Patrol Checklist — Safety', qHdr:'Patrol Checklist — Quality',
+    lblZone:'Zone / Sector', lblChief:'職長', lblPeriod:'Period', lblInsp:'Inspector',
+    compLbl:'Compliance Rate', compSubS:'Safety', compSubQ:'Quality',
+    evOk:'○ Compliant', evNg:'× Non-Compliant', evNone:'Not Evaluated',
+    ntsPh:'Remarks / Notes…',
+    btnReset:'🔄 Clear', btnPdf:'📄 PDF', btnEmail:'📧 Send',
+    ldPdf:'Generating PDF…', ldEmail:'Preparing email…', ldDb:'Saving to database…',
+    toastPdf:'✅ PDF downloaded!', toastReset:'Form cleared!',
+    toastEmail:'📥 PDF downloaded! Attach it to the email.',
+    toastDbOk:'✅ Saved to database!', toastDbErr:'⚠️ Save error',
+    confirmReset:'Clear all form data?',
+    emTitle:'📧 Send via Email', emDesc:'A PDF will be generated and shared through your email app.',
+    emCancel:'Cancel', emSend:'Generate & Send',
+    alertEmail:'Please enter a valid email address.',
+    errPdf:'PDF error: ',
+    stTitle:'⚙️ Manage Registrations', stMembersT:'👤 Patrol Members', stZonesT:'🏭 Zones / Sectors',
+    stDbT:'🗄️ Database (Supabase)',
+    memberPh:'Member name…', zonePh:'Zone name…',
+    addBtn:'＋', emptyList:'No records', settingsDone:'Close',
+    selDefault:'— Select —',
+    stSqlTitle:'① SQL — Run in Supabase',
+    stSqlCopy:'📋 Copy', stSqlCopied:'✅ Copied!',
+    stUrlLbl:'② Project URL', stKeyLbl:'③ Anon Key (API)',
+    stConnectBtn:'Connect',
+    dbConnected:'✅ Connected', dbDisconnected:'⬤ Not connected', dbError:'❌ Connection error',
+    dbConnecting:'Connecting…',
+    histTitle:'📊 History', histEmpty:'No records found', histLoading:'Loading…', histClose:'Close',
+    histS:'Safety', histQ:'Quality',
+    catS1:'Forklift / Picking Operation', catS2:'Status / Behavior',
+    catQ1:'Picking Operation', catQ2:'Transfer Operation', catQ3:'Receiving Operation',
+    sItems:['The forklift/picking charging area is organized and tidy','Start-of-shift and end-of-shift inspections are being carried out correctly','Manager-mandated signage is displayed','The forklift/picking equipment has no scratches or dirt','The forklift key is stored in the designated location','No one approaches within 2m of the forklift; pedestrians are verbally warned','When inserting forks into the pallet, they are inserted all the way to the base','The operator is in reach-in position while driving','The forks are tilted parallel or below while driving','When reversing, the operator checks the rear','At mandatory stop points, the operator stops completely and checks both sides','The operator does not multitask or make sudden movements','When leaving the forklift, the fork tips are touching the floor','The key is removed when parking','There is no visible trash in the zone','Shelves and pallets are inside the white line','PL pillars are not misaligned','"STOP" signage is visible and not faded','No objects are placed outside the designated area (demarcation lines present)','No dust on power strip sockets','3S practices are being applied around the terminals'],
+    qItems:['The PL is being swept with a broom','Protective cardboard is being laid out','Products are being scanned one by one','Scanning is not being done inside the location','The operator completes one full cycle without interruption','No products are being temporarily placed at the location','If an item is picked incorrectly, it is returned to the location first','Abnormal situations are being handled appropriately','Shipment quantity is being verified against the label packaging count','The destination sticker course is being verified against the kanban course','Products have no visible dust','Products are being checked for packaging anomalies (6-face check)','Products are not arranged in a way that they could fall from the PL','Unstable products are always secured before transport','The origin of incoming goods is being confirmed','The appearance of incoming goods is being checked before inspection','During inspection, the same item is not counted twice (marked with a pen)','During inspection, defective products are not accepted','Items are being sorted by external warehouse','Items are being correctly distributed to each external warehouse distribution point'],
+  },
+};
+
+const SAFETY_CATS  = [{key:'catS1',r:[0,14]},{key:'catS2',r:[14,21]}];
+const QUALITY_CATS = [{key:'catQ1',r:[0,12]},{key:'catQ2',r:[12,14]},{key:'catQ3',r:[14,20]}];
+
+/* ═══ LOCALSTORAGE ═══ */
+const STORE = 'patrol_v3';
+const DEFAULT_URL = 'https://ztyicpnnvkviqhmwfezp.supabase.co';
+function getData() { try{const d=JSON.parse(localStorage.getItem(STORE)||'{}'); return {members:d.members||[],zones:d.zones||[],dbUrl:d.dbUrl||DEFAULT_URL,dbKey:d.dbKey||''}}catch(e){return{members:[],zones:[],dbUrl:DEFAULT_URL,dbKey:''}} }
+function saveData(d){ localStorage.setItem(STORE,JSON.stringify(d)) }
+
+/* ═══ SUPABASE ═══ */
+let sbClient = null;
+
+function initSupabase(url, key) {
+  try {
+    sbClient = window.supabase.createClient(url, key);
+    return true;
+  } catch(e) { sbClient = null; return false; }
+}
+
+async function connectDB() {
+  const L = LANGS[currentLang];
+  const url = document.getElementById('db-url').value.trim();
+  const key = document.getElementById('db-key').value.trim();
+  if (!url || !key) { alert('URL e Key são obrigatórios.'); return; }
+
+  setDbStatus('connecting', L.dbConnecting);
+  const ok = initSupabase(url, key);
+  if (!ok) { setDbStatus('err', L.dbError); return; }
+
+  try {
+    const { error } = await sbClient.from('checklist_records').select('id').limit(1);
+    if (error && error.code !== 'PGRST116') throw error;
+    const d = getData(); d.dbUrl = url; d.dbKey = key; saveData(d);
+    setDbStatus('ok', L.dbConnected);
+    document.getElementById('db-dot').classList.add('on');
+    document.getElementById('hist-btn').style.display = 'flex';
+    showToast(L.dbConnected);
+  } catch(e) {
+    setDbStatus('err', L.dbError + ' (' + (e.message||'') + ')');
+  }
+}
+
+function setDbStatus(state, msg) {
+  const el = document.getElementById('db-status-bar');
+  const txt = document.getElementById('db-status-txt');
+  el.className = 'db-status ' + (state==='ok'?'ok':state==='err'?'err':'idle');
+  txt.textContent = msg;
+}
+
+async function saveRecord() {
+  if (!sbClient) return;
+  try {
+    const sComp = document.getElementById('s-comp').textContent;
+    const qComp = document.getElementById('q-comp').textContent;
+    await sbClient.from('checklist_records').insert({
+      zona_s:       document.getElementById('s-zone').value || null,
+      inspetor_s:   document.getElementById('s-insp').value || null,
+      data_s_inicio:document.getElementById('s-d1').value || null,
+      data_s_fim:   document.getElementById('s-d2').value || null,
+      taxa_s:       parseInt(sComp) || null,
+      zona_q:       document.getElementById('q-zone').value || null,
+      inspetor_q:   document.getElementById('q-insp').value || null,
+      data_q_inicio:document.getElementById('q-d1').value || null,
+      data_q_fim:   document.getElementById('q-d2').value || null,
+      taxa_q:       parseInt(qComp) || null,
+      idioma:       currentLang,
+    });
+    showToast(LANGS[currentLang].toastDbOk);
+  } catch(e) {
+    console.warn('DB save error:', e);
+    showToast(LANGS[currentLang].toastDbErr);
+  }
+}
+
+/* ═══ SELECTS ═══ */
+function updateSelects() {
+  const d = getData(), L = LANGS[currentLang];
+  const def = `<option value="">${L.selDefault}</option>`;
+  ['s-insp','q-insp'].forEach(id => {
+    const s = document.getElementById(id); if(!s) return;
+    const cur = s.value;
+    s.innerHTML = def + d.members.map(m=>`<option value="${m}"${m===cur?' selected':''}>${m}</option>`).join('');
+  });
+  ['s-zone','q-zone'].forEach(id => {
+    const s = document.getElementById(id); if(!s) return;
+    const cur = s.value;
+    s.innerHTML = def + d.zones.map(z=>`<option value="${z}"${z===cur?' selected':''}>${z}</option>`).join('');
+  });
+}
+
+/* ═══ SETTINGS ═══ */
+function openSettings() {
+  const d = getData(), L = LANGS[currentLang];
+  document.getElementById('db-url').value = d.dbUrl || '';
+  document.getElementById('db-key').value = d.dbKey || '';
+  if (sbClient) setDbStatus('ok', L.dbConnected);
+  else setDbStatus('idle', L.dbDisconnected);
+  renderSettingsLists();
+  document.getElementById('settings-modal').classList.add('on');
+}
+function closeSettings() {
+  document.getElementById('settings-modal').classList.remove('on');
+  document.getElementById('member-inp').value = '';
+  document.getElementById('zone-inp').value = '';
+}
+function renderSettingsLists() {
+  const d = getData(), L = LANGS[currentLang];
+  const ml = document.getElementById('members-list');
+  ml.innerHTML = d.members.length===0
+    ? `<div class="reg-empty">${L.emptyList}</div>`
+    : d.members.map(m=>`<div class="reg-item"><span class="reg-item-name">👤 ${esc(m)}</span><button class="reg-del" onclick="removeMember(${JSON.stringify(m)})">✕</button></div>`).join('');
+  const zl = document.getElementById('zones-list');
+  zl.innerHTML = d.zones.length===0
+    ? `<div class="reg-empty">${L.emptyList}</div>`
+    : d.zones.map(z=>`<div class="reg-item"><span class="reg-item-name">🏭 ${esc(z)}</span><button class="reg-del" onclick="removeZone(${JSON.stringify(z)})">✕</button></div>`).join('');
+}
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function addMember(){ const i=document.getElementById('member-inp'),n=i.value.trim(); if(!n) return; const d=getData(); if(!d.members.includes(n)){d.members.push(n);saveData(d);} i.value=''; renderSettingsLists(); updateSelects(); }
+function removeMember(n){ const d=getData(); d.members=d.members.filter(m=>m!==n); saveData(d); renderSettingsLists(); updateSelects(); }
+function addZone(){ const i=document.getElementById('zone-inp'),n=i.value.trim(); if(!n) return; const d=getData(); if(!d.zones.includes(n)){d.zones.push(n);saveData(d);} i.value=''; renderSettingsLists(); updateSelects(); }
+function removeZone(n){ const d=getData(); d.zones=d.zones.filter(z=>z!==n); saveData(d); renderSettingsLists(); updateSelects(); }
+function copySQL(){
+  const sql=document.getElementById('db-sql-code').textContent;
+  navigator.clipboard.writeText(sql).then(()=>{
+    const btn=document.getElementById('st-sql-copy');
+    btn.textContent=LANGS[currentLang].stSqlCopied;
+    setTimeout(()=>btn.textContent=LANGS[currentLang].stSqlCopy,2000);
+  });
+}
+
+/* ═══ HISTORY ═══ */
+function openHistory() {
+  document.getElementById('hist-modal').classList.add('on');
+  loadHistory();
+}
+function closeHistory(){ document.getElementById('hist-modal').classList.remove('on'); }
+async function loadHistory() {
+  const L = LANGS[currentLang];
+  const cont = document.getElementById('hist-content');
+  cont.innerHTML = `<div class="hist-loading">${L.histLoading}</div>`;
+  try {
+    const { data, error } = await sbClient
+      .from('checklist_records')
+      .select('*')
+      .order('criado_em', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      cont.innerHTML = `<div class="hist-empty">${L.histEmpty}</div>`; return;
+    }
+    cont.innerHTML = data.map(r => {
+      const dt = new Date(r.criado_em).toLocaleString();
+      const sRow = r.zona_s || r.inspetor_s ? `
+        <div class="hist-row">
+          <span class="hist-badge s">${L.histS}</span>
+          <span class="hist-info">${r.zona_s||'—'} · ${r.inspetor_s||'—'}<br>${r.data_s_inicio||'—'} → ${r.data_s_fim||'—'}</span>
+          <span class="hist-pct" style="color:${pctColor(r.taxa_s)}">${r.taxa_s!=null?r.taxa_s+'%':'—'}</span>
+        </div>` : '';
+      const qRow = r.zona_q || r.inspetor_q ? `
+        <div class="hist-row">
+          <span class="hist-badge q">${L.histQ}</span>
+          <span class="hist-info">${r.zona_q||'—'} · ${r.inspetor_q||'—'}<br>${r.data_q_inicio||'—'} → ${r.data_q_fim||'—'}</span>
+          <span class="hist-pct" style="color:${pctColor(r.taxa_q)}">${r.taxa_q!=null?r.taxa_q+'%':'—'}</span>
+        </div>` : '';
+      return `<div class="hist-record"><div class="hist-date">📅 ${dt}</div>${sRow}${qRow}</div>`;
+    }).join('');
+  } catch(e) {
+    cont.innerHTML = `<div class="hist-empty">⚠️ ${e.message}</div>`;
+  }
+}
+function pctColor(p){ return p==null?'#BDBDBD':p>=80?'#43A047':p>=60?'#FB8C00':'#E53935'; }
+
+/* ═══ STATE ═══ */
+const ST = {s:{}, q:{}};
+let currentLang = 'ja';
+
+/* ═══ RENDER ═══ */
+function renderItems(cid, cats, key, type, L) {
+  let h = '';
+  cats.forEach(({key:k, r}) => {
+    h += `<div class="cat ${type}" id="cat-${type}-${k}">${L[k]}</div>`;
+    for (let i=r[0]; i<r[1]; i++) {
+      const n = i+1;
+      h += `<div class="ci" id="ci-${type}-${n}">
+  <div class="ci-top"><span class="ci-n">${n}</span><span class="ci-t" id="cit-${type}-${n}">${L[key][i]}</span></div>
+  <div class="ci-row">
+    <div class="evg">
+      <button class="ev" id="ev-${type}-${n}-ok" onclick="setEv('${type}',${n},'ok',this)">○</button>
+      <button class="ev" id="ev-${type}-${n}-ng" onclick="setEv('${type}',${n},'ng',this)">×</button>
+    </div>
+    <span class="ev-l" id="el-${type}-${n}" style="color:#BDBDBD">${L.evNone}</span>
+  </div>
+  <textarea class="nts" id="nt-${type}-${n}" placeholder="${L.ntsPh}" rows="1" oninput="ar(this)"></textarea>
+</div>`;
+    }
+  });
+  document.getElementById(cid).innerHTML = h;
+}
+function ar(el){ el.style.height='auto'; el.style.height=el.scrollHeight+'px'; }
+
+/* ═══ LANGUAGE ═══ */
+function setLang(lang) {
+  currentLang = lang;
+  const L = LANGS[lang];
+  document.getElementById('h-title').textContent = L.appTitle;
+  document.getElementById('h-sub').textContent = L.appSub;
+  document.getElementById('tab-s-lbl').textContent = L.tabS;
+  document.getElementById('tab-q-lbl').textContent = L.tabQ;
+  document.getElementById('s-hdr-t').textContent = L.sHdr;
+  document.getElementById('q-hdr-t').textContent = L.qHdr;
+  [['s','lz','lc','lp','li','cl','cs',L.compSubS],['q','lz','lc','lp','li','cl','cs',L.compSubQ]].forEach(([t,,,,,,, sub]) => {
+    document.getElementById(`${t}-lz`).textContent = L.lblZone;
+    document.getElementById(`${t}-lc`).textContent = L.lblChief;
+    document.getElementById(`${t}-lp`).textContent = L.lblPeriod;
+    document.getElementById(`${t}-li`).textContent = L.lblInsp;
+    document.getElementById(`${t}-cl`).textContent = L.compLbl;
+    document.getElementById(`${t}-cs`).textContent = sub;
+  });
+  document.getElementById('btn-reset').textContent = L.btnReset;
+  document.getElementById('btn-pdf').textContent = L.btnPdf;
+  document.getElementById('btn-email').textContent = L.btnEmail;
+  document.getElementById('em-title').textContent = L.emTitle;
+  document.getElementById('em-desc').textContent = L.emDesc;
+  document.getElementById('em-cancel').textContent = L.emCancel;
+  document.getElementById('em-send').textContent = L.emSend;
+  document.getElementById('st-title').textContent = L.stTitle;
+  document.getElementById('st-members-t').textContent = L.stMembersT;
+  document.getElementById('st-zones-t').textContent = L.stZonesT;
+  document.getElementById('st-db-t').textContent = L.stDbT;
+  document.getElementById('member-inp').placeholder = L.memberPh;
+  document.getElementById('zone-inp').placeholder = L.zonePh;
+  document.getElementById('add-member-btn').textContent = L.addBtn;
+  document.getElementById('add-zone-btn').textContent = L.addBtn;
+  document.getElementById('settings-done-btn').textContent = L.settingsDone;
+  document.getElementById('st-sql-title').textContent = L.stSqlTitle;
+  document.getElementById('st-sql-copy').textContent = L.stSqlCopy;
+  document.getElementById('st-url-lbl').textContent = L.stUrlLbl;
+  document.getElementById('st-key-lbl').textContent = L.stKeyLbl;
+  document.getElementById('st-connect-btn').textContent = L.stConnectBtn;
+  document.getElementById('hist-title').textContent = L.histTitle;
+  SAFETY_CATS.forEach(({key:k})=>{ const e=document.getElementById(`cat-s-${k}`); if(e) e.textContent=L[k]; });
+  QUALITY_CATS.forEach(({key:k})=>{ const e=document.getElementById(`cat-q-${k}`); if(e) e.textContent=L[k]; });
+  L.sItems.forEach((t,i)=>{ const e=document.getElementById(`cit-s-${i+1}`); if(e) e.textContent=t; });
+  L.qItems.forEach((t,i)=>{ const e=document.getElementById(`cit-q-${i+1}`); if(e) e.textContent=t; });
+  document.querySelectorAll('.nts').forEach(el=>el.placeholder=L.ntsPh);
+  ['s','q'].forEach(type=>{ const mx=type==='s'?21:20; for(let n=1;n<=mx;n++){ const el=document.getElementById(`el-${type}-${n}`); if(!el) continue; const v=ST[type][n]; if(!v){el.textContent=L.evNone;el.style.color='#BDBDBD';}else if(v==='ok'){el.textContent=L.evOk;el.style.color='#43A047';}else{el.textContent=L.evNg;el.style.color='#E53935';} }});
+  updateSelects();
+  document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.textContent===lang.toUpperCase()));
+  document.title = L.appTitle;
+}
+
+/* ═══ EVAL ═══ */
+function setEv(type,n,val,btn){
+  const L=LANGS[currentLang],cur=ST[type][n];
+  const ok=document.getElementById(`ev-${type}-${n}-ok`),ng=document.getElementById(`ev-${type}-${n}-ng`),lbl=document.getElementById(`el-${type}-${n}`);
+  if(cur===val){delete ST[type][n];ok.classList.remove('ok');ng.classList.remove('ng');lbl.textContent=L.evNone;lbl.style.color='#BDBDBD';}
+  else{ST[type][n]=val;ok.classList.remove('ok');ng.classList.remove('ng');if(val==='ok'){ok.classList.add('ok');lbl.textContent=L.evOk;lbl.style.color='#43A047';}else{ng.classList.add('ng');lbl.textContent=L.evNg;lbl.style.color='#E53935';}}
+  updComp(type);
+}
+function updComp(type){
+  const vals=Object.values(ST[type]),total=vals.length,ok=vals.filter(v=>v==='ok').length;
+  const el=document.getElementById(`${type}-comp`);
+  if(!total){el.textContent='—';el.style.color='#BDBDBD';return;}
+  const pct=Math.round(ok/total*100);
+  el.textContent=pct+'%'; el.style.color=pct>=80?'#43A047':pct>=60?'#FB8C00':'#E53935';
+}
+
+/* ═══ TABS / RESET ═══ */
+function showTab(type,btn){document.querySelectorAll('.sec').forEach(s=>s.classList.remove('on'));document.querySelectorAll('.tab').forEach(b=>b.classList.remove('ts','tq'));document.getElementById(`sec-${type}`).classList.add('on');(btn||document.getElementById(`tab-${type}`)).classList.add(`t${type}`);}
+function doReset(){
+  const L=LANGS[currentLang];
+  if(!confirm(L.confirmReset)) return;
+  ['s','q'].forEach(t=>{Object.keys(ST[t]).forEach(k=>delete ST[t][k]);const cv=document.getElementById(`${t}-comp`);cv.textContent='—';cv.style.color='#BDBDBD';});
+  document.querySelectorAll('.ev').forEach(b=>b.classList.remove('ok','ng'));
+  document.querySelectorAll('.ev-l').forEach(el=>{el.textContent=L.evNone;el.style.color='#BDBDBD';});
+  document.querySelectorAll('.nts').forEach(el=>{el.value='';el.style.height='auto';});
+  document.querySelectorAll('.fi-sel').forEach(el=>el.selectedIndex=0);
+  const today=new Date().toISOString().slice(0,10);
+  ['s-d1','s-d2','q-d1','q-d2'].forEach(id=>document.getElementById(id).value=today);
+  showToast(L.toastReset);
+}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2800);}
+
+/* ═══ EMAIL MODAL ═══ */
+function openEmailModal(){ document.getElementById('email-modal').classList.add('on'); }
+function closeEmailModal(){ document.getElementById('email-modal').classList.remove('on'); }
+
+/* ═══ PDF ═══ */
+async function captureSection(secId){
+  const el=document.getElementById(secId),isV=el.classList.contains('on'),W=window.innerWidth;
+  if(!isV){el.style.display='block';el.style.position='fixed';el.style.left='-9999px';el.style.top='0';el.style.width=W+'px';el.style.zIndex='-1';}
+  await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+  const c=await html2canvas(el,{scale:2,useCORS:true,backgroundColor:'#ECEFF1',logging:false,width:isV?el.offsetWidth:W});
+  if(!isV) el.removeAttribute('style');
+  return c;
+}
+async function buildPDF(){
+  const {jsPDF}=window.jspdf,pdf=new jsPDF('p','mm','a4');
+  const PW=pdf.internal.pageSize.getWidth(),PH=pdf.internal.pageSize.getHeight();
+  document.body.classList.add('pdf-mode');
+  await new Promise(r=>requestAnimationFrame(r));
+  const sc=await captureSection('sec-s'),qc=await captureSection('sec-q');
+  document.body.classList.remove('pdf-mode');
+  const add=(canvas,first)=>{
+    if(!first) pdf.addPage();
+    const img=canvas.toDataURL('image/jpeg',0.88),ratio=canvas.height/canvas.width,ih=PW*ratio;
+    if(ih<=PH){pdf.addImage(img,'JPEG',0,0,PW,ih);}
+    else{let y=0;while(y<ih){if(y>0)pdf.addPage();pdf.addImage(img,'JPEG',0,-y,PW,ih);y+=PH;}}
+  };
+  add(sc,true); add(qc,false);
+  return pdf;
+}
+
+async function makePDF(){
+  const L=LANGS[currentLang],ld=document.getElementById('ld');
+  document.getElementById('ld-t').textContent=L.ldPdf;
+  ld.classList.add('on');
+  try{
+    const pdf=await buildPDF(),fname=`checklist_${new Date().toISOString().slice(0,10)}.pdf`,blob=pdf.output('blob');
+    saveRecord(); // save to DB (non-blocking)
+    if(navigator.share&&navigator.canShare){const f=new File([blob],fname,{type:'application/pdf'});if(navigator.canShare({files:[f]})){ld.classList.remove('on');await navigator.share({files:[f],title:L.appTitle});return;}}
+    pdf.save(fname); showToast(L.toastPdf);
+  }catch(e){if(e.name!=='AbortError'){console.error(e);alert(L.errPdf+e.message);}}
+  finally{ld.classList.remove('on');}
+}
+
+async function sendEmail(){
+  const L=LANGS[currentLang],emailTo=document.getElementById('email-to').value.trim();
+  if(!emailTo){alert(L.alertEmail);return;}
+  closeEmailModal();
+  const ld=document.getElementById('ld');
+  document.getElementById('ld-t').textContent=L.ldEmail;
+  ld.classList.add('on');
+  try{
+    const pdf=await buildPDF(),fname=`checklist_${new Date().toISOString().slice(0,10)}.pdf`,blob=pdf.output('blob');
+    saveRecord(); // save to DB (non-blocking)
+    if(navigator.share&&navigator.canShare){const f=new File([blob],fname,{type:'application/pdf'});if(navigator.canShare({files:[f]})){ld.classList.remove('on');await navigator.share({files:[f],title:L.appTitle+'\u2014'+new Date().toLocaleDateString(),text:L.emDesc});return;}}
+    pdf.save(fname); ld.classList.remove('on');
+    window.open(`mailto:${emailTo}?subject=${encodeURIComponent(L.appTitle+' \u2014 '+new Date().toLocaleDateString())}&body=${encodeURIComponent(L.emDesc+'\n\n'+L.toastEmail)}`,'_self');
+    showToast(L.toastEmail);
+  }catch(e){ld.classList.remove('on');if(e.name!=='AbortError'){console.error(e);alert(L.errPdf+e.message);}}
+}
+
+/* ═══ INIT ═══ */
+function init(){
+  const L=LANGS[currentLang];
+  renderItems('s-items',SAFETY_CATS,'sItems','s',L);
+  renderItems('q-items',QUALITY_CATS,'qItems','q',L);
+  const today=new Date().toISOString().slice(0,10);
+  ['s-d1','s-d2','q-d1','q-d2'].forEach(id=>document.getElementById(id).value=today);
+  // Restore DB connection from localStorage
+  const d=getData();
+  if(d.dbUrl&&d.dbKey){
+    if(initSupabase(d.dbUrl,d.dbKey)){
+      document.getElementById('db-dot').classList.add('on');
+      document.getElementById('hist-btn').style.display='flex';
+    }
+  } else if(!d.dbKey){
+    // First run — show settings with key prompt
+    setTimeout(()=>{
+      showSettings();
+      setDbStatus('idle','⚠️ Cole sua Supabase Anon Key nas configurações abaixo para ativar o banco de dados.');
+    },600);
+  }
+  updateSelects();
+  setLang(currentLang);
+}
+init();
+</script>
+</body>
+</html>
