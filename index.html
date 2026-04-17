@@ -1059,7 +1059,7 @@ function init(){
   } else if(!d.dbKey){
     // First run — show settings with key prompt
     setTimeout(()=>{
-      showSettings();
+      openSettings();
       setDbStatus('idle','⚠️ Cole sua Supabase Anon Key nas configurações abaixo para ativar o banco de dados.');
     },600);
   }
