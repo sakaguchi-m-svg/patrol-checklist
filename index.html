@@ -714,36 +714,82 @@ function buildEmailBody(L){
   const qd2=document.getElementById('q-d2').value||'—';
   const sComp=document.getElementById('s-comp').textContent;
   const qComp=document.getElementById('q-comp').textContent;
+  const now=new Date();
+  const dateStr=now.toLocaleDateString(currentLang==='ja'?'ja-JP':currentLang==='pt'?'pt-BR':currentLang==='id'?'id-ID':'en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const timeStr=now.toLocaleTimeString(currentLang==='ja'?'ja-JP':'pt-BR',{hour:'2-digit',minute:'2-digit'});
+
+  // Count results per section
+  const sCounts={ok:0,ng:0,skip:0};
+  const qCounts={ok:0,ng:0,skip:0};
+  L.sItems.forEach((_,i)=>{const v=ST.s[i+1];if(!v)sCounts.skip++;else if(v==='ok')sCounts.ok++;else sCounts.ng++;});
+  L.qItems.forEach((_,i)=>{const v=ST.q[i+1];if(!v)qCounts.skip++;else if(v==='ok')qCounts.ok++;else qCounts.ng++;});
+
+  const bar='═'.repeat(56);
+  const div='─'.repeat(56);
   const lines=[];
-  lines.push('='.repeat(52));
-  lines.push(L.appTitle);
-  lines.push('='.repeat(52));
+
+  // ── HEADER ──
+  lines.push(bar);
+  lines.push('  🚨 '+L.appTitle.toUpperCase());
+  lines.push('  '+dateStr+'  '+timeStr);
+  lines.push(bar);
   lines.push('');
-  lines.push('['+L.compSubS+'] '+L.compLbl+': '+sComp);
-  lines.push(L.lblZone+': '+sZone+'  |  '+L.lblInsp+': '+sInsp);
-  lines.push(L.lblPeriod+': '+sd1+' ~ '+sd2);
-  lines.push('-'.repeat(40));
-  L.sItems.forEach((item,i)=>{
-    const n=i+1,val=ST.s[n];
-    const status=!val?'[ ]':val==='ok'?'[○]':'[×]';
-    const note=document.getElementById('nt-s-'+n)?.value?.trim();
-    lines.push(status+' '+n+'. '+item);
-    if(note) lines.push('   → '+note);
+
+  // ── SUMMARY ──
+  lines.push('  📊 RESUMO GERAL');
+  lines.push(div);
+  lines.push('  ✅ '+L.compSubS+': '+sComp+'   |   ✅ '+L.compSubQ+': '+qComp);
+  lines.push('');
+
+  // ── SAFETY SECTION ──
+  lines.push(bar);
+  lines.push('  🔵 '+L.sHdr.toUpperCase());
+  lines.push(bar);
+  lines.push('  '+L.lblZone+': '+sZone+'   '+L.lblInsp+': '+sInsp);
+  lines.push('  '+L.lblPeriod+': '+sd1+' → '+sd2);
+  lines.push('  '+L.compLbl+': '+sComp+'   ✅ '+sCounts.ok+'  ❌ '+sCounts.ng+(sCounts.skip?' ⬜ '+sCounts.skip:''));
+  lines.push(div);
+  lines.push('');
+  let lastCat='';
+  SAFETY_CATS.forEach(({key:k,r})=>{
+    if(k!==lastCat){lines.push('  ▶ '+L[k]);lines.push('');lastCat=k;}
+    for(let i=r[0];i<r[1];i++){
+      const n=i+1,val=ST.s[n];
+      const ico=!val?'⬜':val==='ok'?'✅':'❌';
+      const note=document.getElementById('nt-s-'+n)?.value?.trim();
+      lines.push('  '+ico+' '+String(n).padStart(2,'0')+'. '+L.sItems[i]);
+      if(note) lines.push('       📝 '+note);
+    }
+    lines.push('');
   });
+
+  // ── QUALITY SECTION ──
+  lines.push(bar);
+  lines.push('  🟢 '+L.qHdr.toUpperCase());
+  lines.push(bar);
+  lines.push('  '+L.lblZone+': '+qZone+'   '+L.lblInsp+': '+qInsp);
+  lines.push('  '+L.lblPeriod+': '+qd1+' → '+qd2);
+  lines.push('  '+L.compLbl+': '+qComp+'   ✅ '+qCounts.ok+'  ❌ '+qCounts.ng+(qCounts.skip?' ⬜ '+qCounts.skip:''));
+  lines.push(div);
   lines.push('');
-  lines.push('['+L.compSubQ+'] '+L.compLbl+': '+qComp);
-  lines.push(L.lblZone+': '+qZone+'  |  '+L.lblInsp+': '+qInsp);
-  lines.push(L.lblPeriod+': '+qd1+' ~ '+qd2);
-  lines.push('-'.repeat(40));
-  L.qItems.forEach((item,i)=>{
-    const n=i+1,val=ST.q[n];
-    const status=!val?'[ ]':val==='ok'?'[○]':'[×]';
-    const note=document.getElementById('nt-q-'+n)?.value?.trim();
-    lines.push(status+' '+n+'. '+item);
-    if(note) lines.push('   → '+note);
+  lastCat='';
+  QUALITY_CATS.forEach(({key:k,r})=>{
+    if(k!==lastCat){lines.push('  ▶ '+L[k]);lines.push('');lastCat=k;}
+    for(let i=r[0];i<r[1];i++){
+      const n=i+1,val=ST.q[n];
+      const ico=!val?'⬜':val==='ok'?'✅':'❌';
+      const note=document.getElementById('nt-q-'+n)?.value?.trim();
+      lines.push('  '+ico+' '+String(n).padStart(2,'0')+'. '+L.qItems[i]);
+      if(note) lines.push('       📝 '+note);
+    }
+    lines.push('');
   });
-  lines.push('');
-  lines.push('Enviado em: '+new Date().toLocaleString());
+
+  // ── FOOTER ──
+  lines.push(bar);
+  lines.push('  📋 '+L.appTitle+' — Gerado automaticamente');
+  lines.push('  🕐 '+dateStr+', '+timeStr);
+  lines.push(bar);
   return lines.join('\n');
 }
 
