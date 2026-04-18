@@ -343,6 +343,24 @@ CREATE POLICY "open" ON checklist_records
         <button class="db-connect-btn" id="st-ej-save-btn" onclick="saveEmailJS()" style="background:linear-gradient(135deg,#065F46,#059669);box-shadow:0 2px 10px rgba(5,150,105,.35)">Salvar</button>
       </div>
 
+      <!-- Brevo -->
+      <div class="settings-sec">
+        <div class="settings-sec-t" id="st-br-t">📎 Email + PDF (Brevo)</div>
+        <div id="br-status-bar" class="ej-status idle">
+          <span id="br-status-txt">⬤ Não configurado</span>
+        </div>
+        <div class="ej-info" id="br-info-box">Crie conta gratuita em brevo.com (300 emails/dia), obtenha a API Key e verifique seu email como remetente. O PDF será anexado automaticamente.</div>
+        <div class="db-field">
+          <div class="db-field-lbl" id="st-br-key-lbl">API Key</div>
+          <input class="reg-add-inp" style="width:100%;margin:0" id="br-api-key" type="text" placeholder="xkeysib-...">
+        </div>
+        <div class="db-field">
+          <div class="db-field-lbl" id="st-br-sender-lbl">Email Remetente</div>
+          <input class="reg-add-inp" style="width:100%;margin:0" id="br-sender" type="email" placeholder="seu@email.com">
+        </div>
+        <button class="db-connect-btn" id="st-br-save-btn" onclick="saveBrevo()" style="background:linear-gradient(135deg,#1D4ED8,#2563EB);box-shadow:0 2px 10px rgba(37,99,235,.35)">Salvar</button>
+      </div>
+
       <button class="settings-done-btn" id="settings-done-btn" onclick="closeSettings()">閉じる</button>
     </div>
   </div>
@@ -421,6 +439,11 @@ const LANGS = {
     ejConfigured:'✅ EmailJS 設定済み', ejNotConfigured:'⬤ 未設定',
     toastEjSaved:'✅ EmailJS 設定を保存しました!', toastEjSent:'✅ メール送信完了!', toastEjErr:'⚠️ メール送信エラー',
     emDescDirect:'チェックリストの内容を直接メールで送信します。', emDescFallback:'PDFを生成して、メールアプリで送信します。',
+    stBrT:'📎 PDF付きメール (Brevo)',
+    stBrKeyLbl:'API Key', stBrSenderLbl:'送信元メール',
+    stBrSaveBtn:'保存', stBrInfo:'brevo.com で無料アカウントを作成し（1日300通）、API Keyと送信元メールを設定してください。PDFが自動添付されます。',
+    brevoConfigured:'✅ Brevo 設定済み (PDF添付有効)', brevoNotConfigured:'⬤ 未設定',
+    toastBrSaved:'✅ Brevo 設定を保存しました!',
     catS1:'フォークリフト・ピッキー操作', catS2:'状態・行動',
     catQ1:'ピッキング作業', catQ2:'振り出し作業', catQ3:'入荷作業',
     sItems:['リフト・ピッキーの充電場は整理・整頓されている','始業・終業点検が正しく行なわれている','管理者等決められた表示がされているか','リフト・ピッキーにキズ・汚れがない','リフトの鍵は決められた置場に保管する','リフトの2m以内には近付けさせない。歩行者には声かけできている','パレットへの爪差し込み時、根元まで差し込んでいるか','走行時リーチインしているか','走行時爪を平行以上にチルトしているか','リフトで後退する際、後方確認が出来ている','一時停止場所では確実に止まり、右左の確認ができている','ながら動作・急のつく作業をしていないか','リフト離れるときは爪先端を床につけているか','駐車時はキーを抜いているか','ゾーンに目立ったゴミが落ちていない','棚・パレットが白線の内側になっているか','PLの支柱にズレがない','とまれの表示は消えていないか','決められた場所以外に物が置かれていない（区画線がある）','タップコンセントにホコリはない','端末周辺の3Sができているか'],
@@ -463,6 +486,11 @@ const LANGS = {
     ejConfigured:'✅ EmailJS configurado', ejNotConfigured:'⬤ Não configurado',
     toastEjSaved:'✅ EmailJS configurado!', toastEjSent:'✅ Email enviado com sucesso!', toastEjErr:'⚠️ Erro ao enviar email',
     emDescDirect:'O checklist será enviado diretamente para o email informado.', emDescFallback:'O PDF será gerado e compartilhado pelo app de email.',
+    stBrT:'📎 Email + PDF (Brevo)',
+    stBrKeyLbl:'API Key', stBrSenderLbl:'Email Remetente',
+    stBrSaveBtn:'Salvar', stBrInfo:'Crie conta gratuita em brevo.com (300 emails/dia), obtenha a API Key e verifique seu email como remetente. O PDF será anexado automaticamente.',
+    brevoConfigured:'✅ Brevo configurado (PDF habilitado)', brevoNotConfigured:'⬤ Não configurado',
+    toastBrSaved:'✅ Brevo configurado!',
     catS1:'Operação de Empilhadeira / Picking', catS2:'Estado / Comportamento',
     catQ1:'Operação de Picking', catQ2:'Operação de Transferência', catQ3:'Operação de Recebimento',
     sItems:['A área de carregamento da empilhadeira/picking está organizada e arrumada','A inspeção de início e fim de turno está sendo realizada corretamente','As sinalizações definidas pelo gestor estão afixadas','A empilhadeira/picking está sem arranhões ou sujeira','A chave da empilhadeira está guardada no local determinado','Ninguém se aproxima a menos de 2m da empilhadeira; pedestres são avisados verbalmente','Ao inserir os garfos no palete, eles são inseridos até a base','O operador está em posição reach durante a condução','Os garfos estão inclinados paralelos ou abaixo durante a condução','Ao recuar, o operador verifica a parte traseira','Nas paradas obrigatórias, o operador para completamente e verifica os dois lados','O operador não realiza tarefas simultâneas ou movimentos bruscos','Ao se afastar da empilhadeira, os garfos estão com as pontas tocando o chão','Ao estacionar, a chave é removida','Não há lixo visível na zona','Prateleiras e paletes estão dentro da linha branca','Os pilares do PL não estão desalinhados','A sinalização de "PARE" está visível e não apagada','Nenhum objeto está fora do local determinado (há linhas de demarcação)','Não há poeira nas tomadas de extensão','A prática 3S está sendo feita ao redor dos terminais'],
@@ -505,6 +533,11 @@ const LANGS = {
     ejConfigured:'✅ EmailJS terkonfigurasi', ejNotConfigured:'⬤ Belum dikonfigurasi',
     toastEjSaved:'✅ EmailJS disimpan!', toastEjSent:'✅ Email berhasil terkirim!', toastEjErr:'⚠️ Gagal mengirim email',
     emDescDirect:'Isi checklist akan dikirim langsung ke email yang ditentukan.', emDescFallback:'PDF akan dibuat dan dikirim melalui aplikasi email.',
+    stBrT:'📎 Email + PDF (Brevo)',
+    stBrKeyLbl:'API Key', stBrSenderLbl:'Email Pengirim',
+    stBrSaveBtn:'Simpan', stBrInfo:'Buat akun gratis di brevo.com (300 email/hari), dapatkan API Key dan verifikasi email pengirim. PDF akan otomatis dilampirkan.',
+    brevoConfigured:'✅ Brevo terkonfigurasi (PDF aktif)', brevoNotConfigured:'⬤ Belum dikonfigurasi',
+    toastBrSaved:'✅ Brevo disimpan!',
     catS1:'Operasi Forklift / Picking', catS2:'Kondisi / Perilaku',
     catQ1:'Operasi Picking', catQ2:'Operasi Transfer', catQ3:'Operasi Penerimaan',
     sItems:['Area pengisian daya forklift/picking sudah rapi dan teratur','Pemeriksaan awal dan akhir shift sudah dilakukan dengan benar','Rambu-rambu yang ditentukan oleh manajer sudah terpasang','Forklift/picking tidak ada goresan atau kotoran','Kunci forklift disimpan di tempat yang ditentukan','Tidak ada yang mendekati dalam radius 2m dari forklift; pejalan kaki diberi peringatan verbal','Saat memasukkan garpu ke palet, dimasukkan hingga ke pangkalnya','Operator dalam posisi reach saat berkendara','Garpu dimiringkan sejajar atau ke bawah saat berkendara','Saat mundur, operator memeriksa bagian belakang','Di titik berhenti, operator berhenti sepenuhnya dan memeriksa kedua sisi','Operator tidak melakukan multitasking atau gerakan mendadak','Saat meninggalkan forklift, ujung garpu menyentuh lantai','Kunci dicabut saat parkir','Tidak ada sampah yang terlihat di zona','Rak dan palet berada di dalam garis putih','Tiang PL tidak bergeser','Rambu "BERHENTI" terlihat jelas dan tidak pudar','Tidak ada benda di luar tempat yang ditentukan (ada garis demarkasi)','Tidak ada debu pada stop kontak','Praktik 3S sudah diterapkan di sekitar terminal'],
@@ -547,6 +580,11 @@ const LANGS = {
     ejConfigured:'✅ EmailJS configured', ejNotConfigured:'⬤ Not configured',
     toastEjSaved:'✅ EmailJS settings saved!', toastEjSent:'✅ Email sent successfully!', toastEjErr:'⚠️ Failed to send email',
     emDescDirect:'Checklist data will be sent directly to the specified email.', emDescFallback:'A PDF will be generated and shared through your email app.',
+    stBrT:'📎 Email + PDF (Brevo)',
+    stBrKeyLbl:'API Key', stBrSenderLbl:'Sender Email',
+    stBrSaveBtn:'Save', stBrInfo:'Create a free account at brevo.com (300 emails/day), get your API Key and verify a sender email. PDF will be automatically attached.',
+    brevoConfigured:'✅ Brevo configured (PDF enabled)', brevoNotConfigured:'⬤ Not configured',
+    toastBrSaved:'✅ Brevo settings saved!',
     catS1:'Forklift / Picking Operation', catS2:'Status / Behavior',
     catQ1:'Picking Operation', catQ2:'Transfer Operation', catQ3:'Receiving Operation',
     sItems:['The forklift/picking charging area is organized and tidy','Start-of-shift and end-of-shift inspections are being carried out correctly','Manager-mandated signage is displayed','The forklift/picking equipment has no scratches or dirt','The forklift key is stored in the designated location','No one approaches within 2m of the forklift; pedestrians are verbally warned','When inserting forks into the pallet, they are inserted all the way to the base','The operator is in reach-in position while driving','The forks are tilted parallel or below while driving','When reversing, the operator checks the rear','At mandatory stop points, the operator stops completely and checks both sides','The operator does not multitask or make sudden movements','When leaving the forklift, the fork tips are touching the floor','The key is removed when parking','There is no visible trash in the zone','Shelves and pallets are inside the white line','PL pillars are not misaligned','"STOP" signage is visible and not faded','No objects are placed outside the designated area (demarcation lines present)','No dust on power strip sockets','3S practices are being applied around the terminals'],
@@ -560,7 +598,7 @@ const QUALITY_CATS = [{key:'catQ1',r:[0,12]},{key:'catQ2',r:[12,14]},{key:'catQ3
 /* ═══ LOCALSTORAGE ═══ */
 const STORE = 'patrol_v3';
 const DEFAULT_URL = 'https://ztyicpnnvkviqhmwfezp.supabase.co';
-function getData() { try{const d=JSON.parse(localStorage.getItem(STORE)||'{}'); return {members:d.members||[],zones:d.zones||[],dbUrl:d.dbUrl||DEFAULT_URL,dbKey:d.dbKey||'',ejServiceId:d.ejServiceId||'',ejTemplateId:d.ejTemplateId||'',ejPublicKey:d.ejPublicKey||''}}catch(e){return{members:[],zones:[],dbUrl:DEFAULT_URL,dbKey:'',ejServiceId:'',ejTemplateId:'',ejPublicKey:''}} }
+function getData() { try{const d=JSON.parse(localStorage.getItem(STORE)||'{}'); return {members:d.members||[],zones:d.zones||[],dbUrl:d.dbUrl||DEFAULT_URL,dbKey:d.dbKey||'',ejServiceId:d.ejServiceId||'',ejTemplateId:d.ejTemplateId||'',ejPublicKey:d.ejPublicKey||'',brevoApiKey:d.brevoApiKey||'',brevoSender:d.brevoSender||''}}catch(e){return{members:[],zones:[],dbUrl:DEFAULT_URL,dbKey:'',ejServiceId:'',ejTemplateId:'',ejPublicKey:'',brevoApiKey:'',brevoSender:''}} }
 function saveData(d){ localStorage.setItem(STORE,JSON.stringify(d)) }
 
 /* ═══ SUPABASE ═══ */
@@ -652,10 +690,14 @@ function openSettings() {
   document.getElementById('ej-service-id').value = d.ejServiceId || '';
   document.getElementById('ej-template-id').value = d.ejTemplateId || '';
   document.getElementById('ej-public-key').value = d.ejPublicKey || '';
+  document.getElementById('br-api-key').value = d.brevoApiKey || '';
+  document.getElementById('br-sender').value = d.brevoSender || '';
   if (sbClient) setDbStatus('ok', L.dbConnected);
   else setDbStatus('idle', L.dbDisconnected);
   if(d.ejServiceId && d.ejTemplateId && d.ejPublicKey) setEjStatus('ok', L.ejConfigured);
   else setEjStatus('idle', L.ejNotConfigured);
+  if(d.brevoApiKey && d.brevoSender) setBrevoStatus('ok', L.brevoConfigured);
+  else setBrevoStatus('idle', L.brevoNotConfigured);
   renderSettingsLists();
   document.getElementById('settings-modal').classList.add('on');
 }
@@ -701,6 +743,18 @@ function saveEmailJS(){
 }
 function setEjStatus(state,msg){
   const el=document.getElementById('ej-status-bar'),txt=document.getElementById('ej-status-txt');
+  el.className='ej-status '+(state==='ok'?'ok':'idle');txt.textContent=msg;
+}
+function saveBrevo(){
+  const apiKey=document.getElementById('br-api-key').value.trim();
+  const sender=document.getElementById('br-sender').value.trim();
+  const d=getData(); d.brevoApiKey=apiKey; d.brevoSender=sender; saveData(d);
+  const L=LANGS[currentLang];
+  if(apiKey&&sender){setBrevoStatus('ok',L.brevoConfigured);showToast(L.toastBrSaved);}
+  else{setBrevoStatus('idle',L.brevoNotConfigured);}
+}
+function setBrevoStatus(state,msg){
+  const el=document.getElementById('br-status-bar'),txt=document.getElementById('br-status-txt');
   el.className='ej-status '+(state==='ok'?'ok':'idle');txt.textContent=msg;
 }
 function buildEmailBody(L){
@@ -909,6 +963,11 @@ function setLang(lang) {
   document.getElementById('st-ej-key-lbl').textContent = L.stEjKeyLbl;
   document.getElementById('st-ej-save-btn').textContent = L.stEjSaveBtn;
   document.getElementById('ej-info-box').textContent = L.stEjInfo;
+  document.getElementById('st-br-t').textContent = L.stBrT;
+  document.getElementById('st-br-key-lbl').textContent = L.stBrKeyLbl;
+  document.getElementById('st-br-sender-lbl').textContent = L.stBrSenderLbl;
+  document.getElementById('st-br-save-btn').textContent = L.stBrSaveBtn;
+  document.getElementById('br-info-box').textContent = L.stBrInfo;
   SAFETY_CATS.forEach(({key:k})=>{ const e=document.getElementById(`cat-s-${k}`); if(e) e.textContent=L[k]; });
   QUALITY_CATS.forEach(({key:k})=>{ const e=document.getElementById(`cat-q-${k}`); if(e) e.textContent=L[k]; });
   L.sItems.forEach((t,i)=>{ const e=document.getElementById(`cit-s-${i+1}`); if(e) e.textContent=t; });
@@ -955,8 +1014,9 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 /* ═══ EMAIL MODAL ═══ */
 function openEmailModal(){
   const d = getData(), L = LANGS[currentLang];
+  const isBrevoReady = d.brevoApiKey && d.brevoSender;
   const isEjReady = d.ejServiceId && d.ejTemplateId && d.ejPublicKey;
-  document.getElementById('em-desc').textContent = isEjReady ? L.emDescDirect : L.emDescFallback;
+  document.getElementById('em-desc').textContent = (isBrevoReady || isEjReady) ? L.emDescDirect : L.emDescFallback;
   document.getElementById('email-modal').classList.add('on');
 }
 function closeEmailModal(){ document.getElementById('email-modal').classList.remove('on'); }
@@ -1009,7 +1069,42 @@ async function sendEmail(){
   ld.classList.add('on');
 
   const d=getData();
-  // ── Direct send via EmailJS ──
+
+  // ── Brevo: send with PDF attachment ──
+  if(d.brevoApiKey&&d.brevoSender){
+    try{
+      saveRecord();
+      document.getElementById('ld-t').textContent=L.ldPdf;
+      const pdf=await buildPDF();
+      const pdfBase64=pdf.output('base64');
+      const fname='checklist_'+new Date().toISOString().slice(0,10)+'.pdf';
+      const body=buildEmailBody(L);
+      document.getElementById('ld-t').textContent=L.ldEmail;
+      const subject=L.appTitle+' — '+new Date().toLocaleDateString();
+      const htmlBody='<pre style="font-family:monospace;font-size:13px;white-space:pre-wrap">'+body.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre>';
+      const resp=await fetch('https://api.brevo.com/v3/smtp/email',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','api-key':d.brevoApiKey,'accept':'application/json'},
+        body:JSON.stringify({
+          sender:{name:L.appTitle,email:d.brevoSender},
+          to:[{email:emailTo}],
+          subject:subject,
+          htmlContent:htmlBody,
+          attachment:[{content:pdfBase64,name:fname}]
+        })
+      });
+      if(!resp.ok){const err=await resp.json();throw new Error(err.message||'Brevo error '+resp.status);}
+      ld.classList.remove('on');
+      showToast(L.toastEjSent+' 📎');
+    }catch(e){
+      ld.classList.remove('on');
+      console.error('Brevo error:',e);
+      alert(L.toastEjErr+': '+(e.message||JSON.stringify(e)));
+    }
+    return;
+  }
+
+  // ── EmailJS: send text only ──
   if(d.ejServiceId&&d.ejTemplateId&&d.ejPublicKey){
     try{
       saveRecord();
@@ -1031,7 +1126,7 @@ async function sendEmail(){
     return;
   }
 
-  // ── Fallback: PDF + mail client ──
+  // ── Fallback: PDF + share / mail client ──
   try{
     const pdf=await buildPDF(),fname=`checklist_${new Date().toISOString().slice(0,10)}.pdf`,blob=pdf.output('blob');
     saveRecord();
